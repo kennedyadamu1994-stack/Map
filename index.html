@@ -122,15 +122,9 @@
       border-bottom: 1px solid var(--color-border);
       padding: var(--space-4);
       z-index: 1000;
-      display: none; /* Hide filter bar completely */
     }
     
     /* Hide filter bar on mobile by default */
-    @media (max-width: 767px) {
-      .filter-bar {
-        display: none;
-      }
-    }
     
     .filter-content {
       max-width: 1200px;
@@ -141,55 +135,21 @@
       align-items: center;
     }
     
-    /* Mobile: Collapsible filters */
+    /* Mobile: Always show filters, hide toggle button */
     @media (max-width: 767px) {
       .filter-bar {
-        padding: 0;
+        padding: var(--space-4);
       }
       
       .filter-toggle {
-        width: 100%;
-        background: var(--color-surface);
-        border: none;
-        color: var(--color-text-primary);
-        padding: var(--space-4);
-        font-size: 16px;
-        font-weight: 600;
-        cursor: pointer;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-bottom: 1px solid var(--color-border);
-        min-height: 60px;
-      }
-      
-      .filter-toggle:hover {
-        background: rgba(255, 255, 255, 0.05);
-      }
-      
-      .filter-toggle:focus {
-        outline: 2px solid var(--color-primary);
-        outline-offset: -2px;
-      }
-      
-      .filter-toggle-icon {
-        font-size: 20px;
-        transition: transform 0.2s ease-out;
-      }
-      
-      .filter-toggle-icon.expanded {
-        transform: rotate(180deg);
+        display: none; /* Hide the grey "Filters & Search" toggle button */
       }
       
       .filter-content {
-        display: none;
+        display: flex; /* Show filters by default on mobile */
         flex-direction: column;
         padding: var(--space-4);
         border-bottom: 1px solid var(--color-border);
-      }
-      
-      .filter-content.expanded {
-        display: flex;
       }
       
       .filter-content > * {
@@ -1154,7 +1114,7 @@
     
     // Replace this URL with the web app URL from your Google Apps Script deployment
     // It should look like: https://script.google.com/macros/s/AKfycbw_YOUR_ID_HERE/exec
-    const DATA_URL = 'https://script.google.com/macros/s/AKfycbzJfRBrcH7d0Jr7sJbjvVv8Ct0s872lnrQo1FUU4dJNO2RdIbjHA7SI9u2E69JI5mPt/exec';
+    const DATA_URL = 'PASTE_YOUR_GOOGLE_SHEETS_WEB_APP_URL_HERE';
     
     // ============================================
     // MAP SETTINGS
