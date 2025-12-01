@@ -772,14 +772,28 @@
       z-index: 10;
     }
     
-    /* Hide custom close button - Leaflet provides its own on desktop, use backdrop tap on mobile */
-    .popup-close {
-      display: none;
+    /* Show close button on mobile, hide on desktop (Leaflet provides its own) */
+    @media (max-width: 767px) {
+      .popup-close {
+        display: flex !important;
+        position: fixed;
+        top: var(--space-4);
+        right: var(--space-4);
+        z-index: 2002;
+        background: rgba(42, 42, 42, 0.95);
+        backdrop-filter: blur(8px);
+      }
+    }
+    
+    @media (min-width: 768px) {
+      .popup-close {
+        display: none;
+      }
     }
     
     .popup-close:hover {
       color: var(--color-text-primary);
-      background: rgba(255, 255, 255, 0.05);
+      background: rgba(255, 255, 255, 0.1);
     }
     
     .popup-close:focus {
