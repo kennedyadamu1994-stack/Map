@@ -1084,7 +1084,7 @@
     Replace the placeholder URL with YOUR Google Sheets web app URL
     
     It should look like:
-    const DATA_URL = 'https://script.google.com/macros/s/AKfycbzJfRBrcH7d0Jr7sJbjvVv8Ct0s872lnrQo1FUU4dJNO2RdIbjHA7SI9u2E69JI5mPt/exec';
+    const DATA_URL = 'https://script.google.com/macros/s/AKfycbw_YOUR_ID_HERE/exec';
     
     STEP 3: DEPLOY TO VERCEL
     -------------------------
@@ -1554,18 +1554,21 @@
      * @throws {Error} If fetch fails after retries
      */
     async function fetchSessionData(attempt = 1) {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-      
       try {
-        const response = await fetch(DATA_URL, {
-          signal: controller.signal,
+        // Use Promise.race for timeout instead of AbortController to avoid cloning issues
+        const fetchPromise = fetch(DATA_URL, {
+          method: 'GET',
           headers: {
             'Accept': 'application/json'
-          }
+          },
+          cache: 'no-cache'
         });
         
-        clearTimeout(timeoutId);
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Request timed out. Please try again.')), FETCH_TIMEOUT_MS);
+        });
+        
+        const response = await Promise.race([fetchPromise, timeoutPromise]);
         
         if (!response.ok) {
           // Handle specific HTTP errors
@@ -1591,11 +1594,12 @@
         return data;
         
       } catch (error) {
-        clearTimeout(timeoutId);
+        console.error('Fetch error:', error);
         
         // Handle specific errors
-        if (error.name === 'AbortError') {
-          throw new Error('Request timed out. Please try again.');
+        if (error.message.includes('timed out')) {
+          // Already has proper message
+          throw error;
         }
         
         if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
@@ -1603,7 +1607,7 @@
         }
         
         // Retry logic with exponential backoff
-        if (attempt < MAX_RETRY_ATTEMPTS) {
+        if (attempt < MAX_RETRY_ATTEMPTS && !error.message.includes('404')) {
           const delay = Math.pow(2, attempt - 1) * 1000; // 1s, 2s, 4s
           console.log(`Retrying... (attempt ${attempt + 1} of ${MAX_RETRY_ATTEMPTS})`);
           announceToScreenReader(`Retrying... (attempt ${attempt + 1} of ${MAX_RETRY_ATTEMPTS})`);
