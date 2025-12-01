@@ -1,0 +1,2606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+  <meta name="description" content="Find and book sports sessions across London. Basketball, football, volleyball, yoga and more. Quicker, cheaper, better.">
+  <meta name="keywords" content="sports sessions, London, basketball, football, book sports, fitness, NBRH">
+  <meta name="author" content="NBRH">
+  
+  <!-- Open Graph (social sharing) -->
+  <meta property="og:title" content="NBRH - Find Sports Sessions Across London">
+  <meta property="og:description" content="Find and book sports sessions across London. Quicker, cheaper, better.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://nbrh.app/">
+  
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="NBRH - Find Sports Sessions">
+  <meta name="twitter:description" content="Find and book sports sessions across London">
+  
+  <title>NBRH - Find Sports Sessions Across London</title>
+  
+  <!-- Preconnect to CDN for faster loading -->
+  <link rel="preconnect" href="https://unpkg.com">
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin="anonymous"/>
+  
+  <!-- Leaflet MarkerCluster CSS (loaded conditionally via JS if needed) -->
+  
+  <style>
+    /* ============================================
+       NBRH BRAND STYLES - RESET & BASE
+       ============================================ */
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    :root {
+      /* Brand Colors */
+      --color-primary: #FF1493;
+      --color-background: #1a1a1a;
+      --color-surface: #2a2a2a;
+      --color-text-primary: #FFFFFF;
+      --color-text-secondary: #B3B3B3;
+      --color-border: #3a3a3a;
+      --color-success: #10B981;
+      --color-error: #EF4444;
+      --color-warning: #F59E0B;
+      
+      /* Typography */
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      
+      /* Spacing (4px scale) */
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-6: 24px;
+      --space-8: 32px;
+      --space-12: 48px;
+      --space-16: 64px;
+      
+      /* Border Radius */
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-pill: 16px;
+      
+      /* Shadows */
+      --shadow-subtle: 0 2px 8px rgba(0,0,0,0.15);
+      --shadow-medium: 0 4px 16px rgba(0,0,0,0.25);
+      --shadow-strong: 0 8px 24px rgba(0,0,0,0.4);
+    }
+    
+    body {
+      font-family: var(--font-family);
+      background-color: var(--color-background);
+      color: var(--color-text-primary);
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+    
+    /* Skip link for keyboard navigation */
+    .skip-link {
+      position: absolute;
+      top: -100px;
+      left: 0;
+      background: var(--color-primary);
+      color: white;
+      padding: var(--space-2) var(--space-4);
+      text-decoration: none;
+      z-index: 10000;
+      border-radius: 0 0 var(--radius-md) 0;
+    }
+    
+    .skip-link:focus {
+      top: 0;
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+    }
+    
+    /* ============================================
+       LAYOUT
+       ============================================ */
+    
+    .app-container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      position: relative;
+    }
+    
+    /* Filter Bar */
+    .filter-bar {
+      background: var(--color-surface);
+      border-bottom: 1px solid var(--color-border);
+      padding: var(--space-4);
+      z-index: 1000;
+    }
+    
+    .filter-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-4);
+      align-items: center;
+    }
+    
+    /* Mobile: Collapsible filters */
+    @media (max-width: 767px) {
+      .filter-bar {
+        padding: 0;
+      }
+      
+      .filter-toggle {
+        width: 100%;
+        background: var(--color-surface);
+        border: none;
+        color: var(--color-text-primary);
+        padding: var(--space-4);
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--color-border);
+        min-height: 60px;
+      }
+      
+      .filter-toggle:hover {
+        background: rgba(255, 255, 255, 0.05);
+      }
+      
+      .filter-toggle:focus {
+        outline: 2px solid var(--color-primary);
+        outline-offset: -2px;
+      }
+      
+      .filter-toggle-icon {
+        font-size: 20px;
+        transition: transform 0.2s ease-out;
+      }
+      
+      .filter-toggle-icon.expanded {
+        transform: rotate(180deg);
+      }
+      
+      .filter-content {
+        display: none;
+        flex-direction: column;
+        padding: var(--space-4);
+        border-bottom: 1px solid var(--color-border);
+      }
+      
+      .filter-content.expanded {
+        display: flex;
+      }
+      
+      .filter-content > * {
+        width: 100%;
+      }
+    }
+    
+    /* Map Container */
+    #map {
+      flex: 1;
+      min-height: 60vh;
+      position: relative;
+    }
+    
+    /* ============================================
+       FORM CONTROLS
+       ============================================ */
+    
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+      flex: 1;
+      min-width: 200px;
+    }
+    
+    @media (min-width: 768px) {
+      .input-group {
+        max-width: 300px;
+      }
+    }
+    
+    label {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--color-text-secondary);
+    }
+    
+    select, input[type="text"] {
+      background: var(--color-background);
+      border: 1px solid var(--color-border);
+      color: var(--color-text-primary);
+      padding: var(--space-3) var(--space-4);
+      font-size: 16px;
+      border-radius: var(--radius-sm);
+      height: 48px;
+      font-family: var(--font-family);
+      transition: all 0.2s ease-out;
+    }
+    
+    select:focus, input[type="text"]:focus {
+      outline: none;
+      border: 2px solid var(--color-primary);
+      padding: calc(var(--space-3) - 1px) calc(var(--space-4) - 1px);
+    }
+    
+    select {
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23fff' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 40px;
+    }
+    
+    /* Search Input with Icon */
+    .search-wrapper {
+      position: relative;
+      flex: 1;
+    }
+    
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--color-text-secondary);
+      pointer-events: none;
+    }
+    
+    .search-wrapper input {
+      padding-left: 40px;
+      padding-right: 40px;
+    }
+    
+    .search-clear {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      padding: var(--space-2);
+      font-size: 18px;
+      display: none;
+      min-width: 44px;
+      min-height: 44px;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .search-clear:hover {
+      color: var(--color-text-primary);
+    }
+    
+    .search-clear:focus {
+      outline: 2px solid var(--color-primary);
+      outline-offset: -2px;
+      border-radius: var(--radius-sm);
+    }
+    
+    .search-clear.visible {
+      display: flex;
+    }
+    
+    input::placeholder {
+      color: #666666;
+    }
+    
+    /* ============================================
+       BUTTONS
+       ============================================ */
+    
+    button {
+      font-family: var(--font-family);
+      cursor: pointer;
+      transition: all 0.1s ease-in-out;
+      border: none;
+      min-height: 44px;
+      min-width: 44px;
+    }
+    
+    .btn-primary {
+      background: var(--color-primary);
+      color: white;
+      padding: var(--space-3) var(--space-6);
+      border-radius: var(--radius-md);
+      font-size: 16px;
+      font-weight: 600;
+      min-height: 48px;
+    }
+    
+    .btn-primary:hover:not(:disabled) {
+      background: #ff3da6;
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-subtle);
+    }
+    
+    .btn-primary:active:not(:disabled) {
+      background: #cc0f73;
+      transform: translateY(0);
+    }
+    
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .btn-primary:focus {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+    }
+    
+    .btn-secondary {
+      background: transparent;
+      color: white;
+      border: 1px solid white;
+      padding: var(--space-3) var(--space-6);
+      border-radius: var(--radius-md);
+      font-size: 14px;
+      font-weight: 500;
+    }
+    
+    .btn-secondary:hover:not(:disabled) {
+      background: white;
+      color: var(--color-background);
+    }
+    
+    .btn-secondary:focus {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+    }
+    
+    .btn-icon {
+      background: transparent;
+      color: var(--color-text-secondary);
+      padding: var(--space-2);
+      border-radius: var(--radius-sm);
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    
+    .btn-icon:hover {
+      color: var(--color-text-primary);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    
+    .btn-icon:focus {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+    }
+    
+    .btn-clear-filters {
+      background: transparent;
+      color: var(--color-text-secondary);
+      border: 1px solid var(--color-border);
+      padding: var(--space-3) var(--space-4);
+      border-radius: var(--radius-md);
+      font-size: 14px;
+      display: none;
+    }
+    
+    .btn-clear-filters.visible {
+      display: block;
+    }
+    
+    .btn-clear-filters:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--color-text-primary);
+      border-color: var(--color-text-secondary);
+    }
+    
+    @media (max-width: 767px) {
+      .btn-clear-filters {
+        width: 100%;
+      }
+    }
+    
+    /* ============================================
+       RESULTS & STATUS
+       ============================================ */
+    
+    .results-info {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      margin-left: auto;
+      font-size: 14px;
+      color: var(--color-text-secondary);
+    }
+    
+    @media (max-width: 767px) {
+      .results-info {
+        margin-left: 0;
+        width: 100%;
+        justify-content: space-between;
+        order: -1;
+      }
+    }
+    
+    .result-count {
+      white-space: nowrap;
+    }
+    
+    .last-updated {
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      position: absolute;
+      bottom: var(--space-2);
+      left: var(--space-2);
+      background: rgba(26, 26, 26, 0.9);
+      padding: var(--space-1) var(--space-2);
+      border-radius: var(--radius-sm);
+      z-index: 400;
+      pointer-events: none;
+    }
+    
+    @media (max-width: 767px) {
+      .last-updated {
+        font-size: 10px;
+      }
+    }
+    
+    /* ============================================
+       LOADING STATES
+       ============================================ */
+    
+    .loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--color-background);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      gap: var(--space-4);
+    }
+    
+    .loading-overlay.hidden {
+      display: none;
+    }
+    
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid var(--color-border);
+      border-top-color: var(--color-primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .loading-text {
+      font-size: 16px;
+      color: var(--color-text-secondary);
+    }
+    
+    .refresh-pulse {
+      animation: pulse 1s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    /* ============================================
+       NOTIFICATIONS (Toasts, Banners, Errors)
+       ============================================ */
+    
+    .notification-banner {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: var(--space-4);
+      text-align: center;
+      font-size: 16px;
+      z-index: 1500;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-4);
+    }
+    
+    .notification-banner.visible {
+      display: flex;
+    }
+    
+    .notification-banner.error {
+      background: var(--color-error);
+      color: white;
+    }
+    
+    .notification-banner.warning {
+      background: var(--color-warning);
+      color: var(--color-background);
+    }
+    
+    .notification-banner.info {
+      background: var(--color-surface);
+      color: var(--color-text-primary);
+      border-bottom: 1px solid var(--color-border);
+    }
+    
+    .notification-close {
+      background: none;
+      border: none;
+      color: inherit;
+      font-size: 20px;
+      cursor: pointer;
+      padding: var(--space-2);
+      margin-left: auto;
+    }
+    
+    .toast {
+      position: fixed;
+      bottom: var(--space-6);
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--color-success);
+      color: white;
+      padding: var(--space-3) var(--space-6);
+      border-radius: var(--radius-pill);
+      font-size: 14px;
+      z-index: 3000;
+      box-shadow: var(--shadow-strong);
+      opacity: 0;
+      transition: opacity 0.2s ease-out;
+    }
+    
+    .toast.visible {
+      opacity: 1;
+    }
+    
+    /* ============================================
+       EMPTY STATES
+       ============================================ */
+    
+    .empty-state {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      z-index: 500;
+      pointer-events: none;
+      max-width: 400px;
+      padding: var(--space-6);
+    }
+    
+    .empty-state.hidden {
+      display: none;
+    }
+    
+    .empty-state-emoji {
+      font-size: 64px;
+      margin-bottom: var(--space-4);
+    }
+    
+    .empty-state-title {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: var(--space-2);
+      color: var(--color-text-primary);
+    }
+    
+    .empty-state-message {
+      font-size: 16px;
+      color: var(--color-text-secondary);
+    }
+    
+    /* ============================================
+       LEAFLET MARKER CUSTOMIZATION
+       ============================================ */
+    
+    .custom-marker {
+      background: transparent;
+      border: none;
+      font-size: 32px;
+      line-height: 32px;
+      text-align: center;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+      animation: markerFadeIn 0.2s ease-out;
+    }
+    
+    @keyframes markerFadeIn {
+      from {
+        opacity: 0;
+        transform: scale(0.8);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+    
+    /* MarkerCluster styles */
+    .marker-cluster {
+      background: var(--color-primary);
+      color: white;
+      border-radius: 50%;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--shadow-medium);
+    }
+    
+    .marker-cluster-small {
+      width: 40px;
+      height: 40px;
+      font-size: 14px;
+    }
+    
+    .marker-cluster-medium {
+      width: 50px;
+      height: 50px;
+      font-size: 16px;
+    }
+    
+    .marker-cluster-large {
+      width: 60px;
+      height: 60px;
+      font-size: 18px;
+    }
+    
+    /* ============================================
+       POPUP STYLES
+       ============================================ */
+    
+    /* Desktop popup */
+    @media (min-width: 768px) {
+      .leaflet-popup-content-wrapper {
+        background: var(--color-surface);
+        color: var(--color-text-primary);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-strong);
+        padding: 0;
+        max-width: 400px;
+      }
+      
+      .leaflet-popup-content {
+        margin: 0;
+        width: 100% !important;
+      }
+      
+      .leaflet-popup-tip {
+        background: var(--color-surface);
+      }
+      
+      .leaflet-popup-close-button {
+        color: var(--color-text-secondary) !important;
+        font-size: 24px !important;
+        padding: var(--space-2) !important;
+        width: 44px !important;
+        height: 44px !important;
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      .leaflet-popup-close-button:hover {
+        color: var(--color-text-primary) !important;
+      }
+      
+      .leaflet-popup-close-button:focus {
+        outline: 2px solid var(--color-primary) !important;
+        outline-offset: -2px;
+      }
+    }
+    
+    /* Mobile bottom sheet */
+    @media (max-width: 767px) {
+      .mobile-popup-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 2000;
+        display: none;
+      }
+      
+      .mobile-popup-backdrop.visible {
+        display: block;
+      }
+      
+      .mobile-popup {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: var(--color-surface);
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        z-index: 2001;
+        max-height: 80vh;
+        overflow-y: auto;
+        transform: translateY(100%);
+        transition: transform 0.2s ease-out;
+        box-shadow: var(--shadow-strong);
+      }
+      
+      .mobile-popup.visible {
+        transform: translateY(0);
+      }
+      
+      .mobile-popup-handle {
+        width: 40px;
+        height: 4px;
+        background: var(--color-border);
+        border-radius: 2px;
+        margin: var(--space-2) auto;
+      }
+      
+      /* Hide default Leaflet popup on mobile */
+      .leaflet-popup {
+        display: none;
+      }
+    }
+    
+    /* Popup content */
+    .popup-content {
+      padding: var(--space-6);
+    }
+    
+    @media (max-width: 767px) {
+      .popup-content {
+        padding: var(--space-4);
+        padding-top: 0;
+      }
+    }
+    
+    .popup-close {
+      position: absolute;
+      top: var(--space-4);
+      right: var(--space-4);
+      background: none;
+      border: none;
+      color: var(--color-text-secondary);
+      font-size: 24px;
+      cursor: pointer;
+      padding: var(--space-2);
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-sm);
+      z-index: 10;
+    }
+    
+    .popup-close:hover {
+      color: var(--color-text-primary);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    
+    .popup-close:focus {
+      outline: 2px solid var(--color-primary);
+      outline-offset: -2px;
+    }
+    
+    .popup-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--color-primary);
+      margin-bottom: var(--space-4);
+      padding-right: var(--space-12);
+    }
+    
+    .popup-sport {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: 16px;
+      margin-bottom: var(--space-4);
+    }
+    
+    .popup-sport-icon {
+      font-size: 20px;
+    }
+    
+    .popup-location {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: var(--space-1);
+    }
+    
+    .popup-address {
+      font-size: 14px;
+      color: var(--color-text-secondary);
+      margin-bottom: var(--space-1);
+    }
+    
+    .popup-directions {
+      font-size: 14px;
+      color: var(--color-primary);
+      text-decoration: none;
+      display: inline-block;
+      margin-bottom: var(--space-4);
+    }
+    
+    .popup-directions:hover {
+      text-decoration: underline;
+    }
+    
+    .popup-directions:focus {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+      border-radius: var(--radius-sm);
+    }
+    
+    .popup-datetime {
+      margin-bottom: var(--space-4);
+    }
+    
+    .popup-date {
+      font-size: 16px;
+      margin-bottom: var(--space-1);
+    }
+    
+    .popup-time {
+      font-size: 16px;
+      color: var(--color-text-secondary);
+    }
+    
+    .popup-price {
+      font-size: 16px;
+      margin-bottom: var(--space-2);
+    }
+    
+    .popup-status {
+      display: inline-block;
+      background: var(--color-border);
+      color: var(--color-text-secondary);
+      padding: var(--space-1) var(--space-3);
+      border-radius: var(--radius-pill);
+      font-size: 12px;
+      margin-bottom: var(--space-4);
+    }
+    
+    .popup-actions {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+    
+    .popup-actions .btn-primary,
+    .popup-actions .btn-secondary {
+      width: 100%;
+      justify-content: center;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    
+    /* ============================================
+       ACCESSIBILITY
+       ============================================ */
+    
+    /* Focus visible styles */
+    *:focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+    }
+    
+    /* Screen reader only content */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border-width: 0;
+    }
+    
+    /* Announcements for screen readers */
+    .sr-announcements {
+      position: absolute;
+      left: -10000px;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+    }
+    
+    /* No JavaScript fallback */
+    .no-js-message {
+      display: none;
+      text-align: center;
+      padding: var(--space-12);
+      max-width: 600px;
+      margin: 0 auto;
+      background: var(--color-surface);
+      border-radius: var(--radius-lg);
+      margin-top: var(--space-12);
+    }
+    
+    .no-js-message h1 {
+      color: var(--color-primary);
+      margin-bottom: var(--space-4);
+      font-size: 24px;
+    }
+    
+    .no-js-message p {
+      color: var(--color-text-secondary);
+      font-size: 16px;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <!-- Skip link for accessibility -->
+  <a href="#map" class="skip-link">Skip to map</a>
+  
+  <!-- No JavaScript fallback -->
+  <noscript>
+    <div class="no-js-message">
+      <h1>JavaScript Required</h1>
+      <p>Please enable JavaScript to view the interactive session map. This feature requires JavaScript to fetch and display sports sessions across London.</p>
+    </div>
+  </noscript>
+  
+  <!-- Main App Container -->
+  <div class="app-container">
+    <!-- Filter Bar -->
+    <nav class="filter-bar" role="navigation" aria-label="Session filters">
+      <!-- Mobile filter toggle -->
+      <button class="filter-toggle" aria-expanded="false" aria-controls="filter-content">
+        <span>Filters & Search</span>
+        <span class="filter-toggle-icon" aria-hidden="true">▼</span>
+      </button>
+      
+      <!-- Filter Controls -->
+      <div id="filter-content" class="filter-content">
+        <!-- Sport Filter -->
+        <div class="input-group">
+          <label for="sport-filter" class="sr-only">Filter sessions by sport</label>
+          <select id="sport-filter" aria-label="Filter sessions by sport">
+            <option value="all">All sports</option>
+          </select>
+        </div>
+        
+        <!-- Search Bar -->
+        <div class="input-group search-wrapper">
+          <label for="search-input" class="sr-only">Search sessions by name, location, or address</label>
+          <span class="search-icon" aria-hidden="true">🔍</span>
+          <input 
+            type="text" 
+            id="search-input" 
+            placeholder="Search by name, location, or address"
+            aria-label="Search sessions by name, location, or address"
+            autocomplete="off"
+          />
+          <button class="search-clear" aria-label="Clear search" tabindex="-1">
+            ✕
+          </button>
+        </div>
+        
+        <!-- Results Info & Actions -->
+        <div class="results-info">
+          <span id="result-count" class="result-count" aria-live="polite" aria-atomic="true">Loading...</span>
+          <button id="refresh-btn" class="btn-icon" aria-label="Refresh session data" title="Refresh sessions">
+            <span aria-hidden="true">↻</span>
+          </button>
+        </div>
+        
+        <!-- Clear Filters Button -->
+        <button id="clear-filters" class="btn-clear-filters" aria-label="Clear all filters">
+          Clear filters
+        </button>
+      </div>
+    </nav>
+    
+    <!-- Notification Banner -->
+    <div id="notification-banner" class="notification-banner" role="alert">
+      <span id="notification-message"></span>
+      <button class="notification-close" aria-label="Close notification">✕</button>
+    </div>
+    
+    <!-- Map Container -->
+    <main id="map" role="application" aria-label="Interactive map of sports sessions across London">
+      <!-- Loading Overlay -->
+      <div id="loading-overlay" class="loading-overlay">
+        <div class="spinner" aria-hidden="true"></div>
+        <div class="loading-text">Loading sessions...</div>
+      </div>
+      
+      <!-- Empty State -->
+      <div id="empty-state" class="empty-state hidden">
+        <div class="empty-state-emoji" aria-hidden="true">📅</div>
+        <div class="empty-state-title">No sessions available</div>
+        <div class="empty-state-message">Check back soon for upcoming sports sessions!</div>
+      </div>
+      
+      <!-- Last Updated Timestamp -->
+      <div id="last-updated" class="last-updated" aria-live="polite"></div>
+    </main>
+    
+    <!-- Mobile Popup (Bottom Sheet) -->
+    <div id="mobile-popup-backdrop" class="mobile-popup-backdrop"></div>
+    <div id="mobile-popup" class="mobile-popup" role="dialog" aria-labelledby="popup-title" aria-modal="true">
+      <div class="mobile-popup-handle" aria-hidden="true"></div>
+      <div id="mobile-popup-content" class="popup-content"></div>
+    </div>
+    
+    <!-- Toast Notification -->
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    
+    <!-- Screen Reader Announcements -->
+    <div id="sr-announcements" class="sr-announcements" role="status" aria-live="polite" aria-atomic="true"></div>
+  </div>
+  
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin="anonymous"></script>
+  
+  <!-- Main Application Script -->
+  <script>
+    /*
+    ============================================
+    NBRH SESSION MAP - SETUP INSTRUCTIONS
+    ============================================
+    
+    STEP 1: SET UP GOOGLE SHEETS API ENDPOINT
+    ------------------------------------------
+    See the separate file: google-apps-script.js
+    Follow the instructions in that file to:
+    - Deploy your Google Sheet as a JSON endpoint
+    - Get your web app URL
+    
+    STEP 2: PASTE YOUR URL BELOW
+    -----------------------------
+    Find the DATA_URL constant below (around line 620)
+    Replace the placeholder URL with YOUR Google Sheets web app URL
+    
+    It should look like:
+    const DATA_URL = 'https://script.google.com/macros/s/AKfycbzJfRBrcH7d0Jr7sJbjvVv8Ct0s872lnrQo1FUU4dJNO2RdIbjHA7SI9u2E69JI5mPt/exec';
+    
+    STEP 3: DEPLOY TO VERCEL
+    -------------------------
+    1. Create a folder called "nbrh-map"
+    2. Put this index.html file in that folder
+    3. Go to vercel.com and sign in
+    4. Drag the folder onto Vercel dashboard
+    5. Copy your Vercel URL (e.g., https://nbrh-map.vercel.app)
+    
+    STEP 4: EMBED IN SQUARESPACE
+    -----------------------------
+    1. In Squarespace, add a Code/Embed block
+    2. Paste this code (replace with YOUR Vercel URL):
+    
+       <iframe 
+         src="https://YOUR-VERCEL-URL.vercel.app" 
+         width="100%" 
+         height="600px" 
+         frameborder="0"
+         style="border: none;">
+       </iframe>
+    
+    TROUBLESHOOTING:
+    - No sessions showing? Check browser console for errors (F12)
+    - CORS error? Ensure your Apps Script is deployed with "Anyone" access
+    - Map not loading? Check that Leaflet CDN is accessible
+    - Filters not working? Verify your data matches the expected format
+    
+    CUSTOMIZATION:
+    - Change map center: Edit DEFAULT_MAP_CENTER below
+    - Add new sports: Add emoji to SPORT_ICON_MAP
+    - Adjust colors: Edit COLORS object
+    - Modify column names: Update COLUMN_MAP
+    
+    BROWSER SUPPORT:
+    - Chrome, Firefox, Safari, Edge (last 2 versions)
+    - Mobile: iOS Safari, Chrome Android
+    - No IE11 support
+    
+    ============================================
+    */
+    
+    // ============================================
+    // ⚠️ IMPORTANT: PASTE YOUR GOOGLE SHEETS URL HERE
+    // ============================================
+    
+    // Replace this URL with the web app URL from your Google Apps Script deployment
+    // It should look like: https://script.google.com/macros/s/AKfycbw_YOUR_ID_HERE/exec
+    const DATA_URL = 'https://script.google.com/macros/s/AKfycbzJfRBrcH7d0Jr7sJbjvVv8Ct0s872lnrQo1FUU4dJNO2RdIbjHA7SI9u2E69JI5mPt/exec';
+    
+    // ============================================
+    // MAP SETTINGS
+    // ============================================
+    const DEFAULT_MAP_CENTER = [51.5074, -0.1278]; // [latitude, longitude] for London
+    const DEFAULT_MAP_ZOOM = 11; // Zoom level (1-18, higher = closer)
+    const MIN_ZOOM = 9; // Prevent zooming out too far
+    const MAX_ZOOM = 18; // Maximum zoom level
+    
+    // Sport icon mapping (Sport name → Emoji)
+    const SPORT_ICON_MAP = {
+      'Basketball': '🏀',
+      'Football': '⚽',
+      'Volleyball': '🏐',
+      'Tennis': '🎾',
+      'Yoga': '🧘',
+      'Running': '🏃',
+      'Cycling': '🚴',
+      'Swimming': '🏊',
+      'Rugby': '🏉',
+      'Badminton': '🏸',
+      'Boxing': '🥊',
+      'Climbing': '🧗',
+      'Dance': '💃',
+      'Fitness': '💪',
+      'Gym': '🏋️',
+      'Hockey': '🏒',
+      'Martial Arts': '🥋',
+      'Netball': '🥅',
+      'Padel': '🎾',
+      'Pilates': '🧘‍♀️',
+      'Rounders': '⚾',
+      'Skateboarding': '🛹',
+      'Squash': '🎾',
+      'Table Tennis': '🏓',
+      'default': '📍' // Fallback for unknown sports
+    };
+    
+    // Column mapping (code field name → Google Sheet column name)
+    // Update these if your sheet uses different column names
+    const COLUMN_MAP = {
+      sessionName: 'Session Name',
+      sport: 'Sport',
+      latitude: 'Latitude',
+      longitude: 'Longitude',
+      sessionStatus: 'Session Status',
+      location: 'Location',
+      address: 'Address',
+      date: 'Date',
+      startTime: 'Start Time',
+      endTime: 'End Time',
+      basePrice: 'Base Price',
+      bookingURL: 'Booking URL',
+      sessionID: 'Session ID'
+    };
+    
+    // Brand colors (NBRH palette)
+    const COLORS = {
+      primary: '#FF1493',      // Hot pink
+      background: '#1a1a1a',   // Soft black
+      surface: '#2a2a2a',      // Lighter black
+      textPrimary: '#FFFFFF',  // White
+      textSecondary: '#B3B3B3',// Grey
+      border: '#3a3a3a',       // Subtle grey
+      success: '#10B981',      // Green
+      error: '#EF4444',        // Red
+      warning: '#F59E0B'       // Amber
+    };
+    
+    // Performance settings
+    const MARKER_CLUSTER_THRESHOLD = 100; // Enable clustering if more than this many markers
+    const MAX_EVENTS_TO_DISPLAY = 500; // Maximum events to plot on map
+    const SEARCH_DEBOUNCE_MS = 300; // Delay before search executes
+    const SEARCH_MIN_CHARS = 2; // Minimum characters before search activates
+    const AUTO_REFRESH_INTERVAL_MS = 300000; // 5 minutes
+    const FETCH_TIMEOUT_MS = 10000; // 10 seconds
+    const MAX_RETRY_ATTEMPTS = 3; // Maximum fetch retry attempts
+    const CACHE_EXPIRY_MS = 86400000; // 24 hours in milliseconds
+    const CACHE_VERSION = 1; // Increment when data structure changes
+    
+    /*
+    ============================================
+    EXPECTED DATA FORMAT FROM DATA_URL
+    ============================================
+    
+    Your endpoint should return JSON in this format:
+    
+    [
+      {
+        "Session Name": "Monday Night Basketball",
+        "Sport": "Basketball",
+        "Latitude": 51.5074,
+        "Longitude": -0.1278,
+        "Session Status": "General Access",
+        "Location": "Hackney Community Centre",
+        "Address": "123 High Street, London E8 1AA",
+        "Date": "2025-12-01",
+        "Start Time": "18:00",
+        "End Time": "20:00",
+        "Base Price": "£8.00",
+        "Booking URL": "https://example.com/book/123",
+        "Session ID": "sess_001"
+      }
+    ]
+    
+    Required fields:
+    - Session Name, Sport, Latitude, Longitude, Session Status, Date, Start Time
+    
+    Optional fields:
+    - End Time, Base Price, Booking URL, Address, Session ID
+    
+    Notes:
+    - Dates must be ISO 8601 format (YYYY-MM-DD)
+    - Times must be 24-hour format (HH:MM)
+    - Latitude: -90 to 90
+    - Longitude: -180 to 180
+    - Session Status: Must be "General Access" to display
+    
+    ============================================
+    */
+    
+    // ============================================
+    // GLOBAL STATE
+    // ============================================
+    
+    let map; // Leaflet map instance
+    let markersLayer; // Layer group for all markers
+    let markerClusterGroup; // MarkerCluster group (if clustering enabled)
+    let allSessions = []; // All session data from API
+    let filteredSessions = []; // Currently filtered sessions
+    let currentFilters = {
+      sport: 'all',
+      search: ''
+    };
+    let lastFocusedElement = null; // For focus management
+    let searchDebounceTimer = null; // For search debouncing
+    let autoRefreshTimer = null; // For auto-refresh interval
+    let retryCount = 0; // Current retry attempt
+    let isInitialLoad = true; // Track if this is the first load
+    
+    // ============================================
+    // UTILITY FUNCTIONS
+    // ============================================
+    
+    /**
+     * Escapes HTML entities to prevent XSS attacks
+     * @param {string} text - Text to escape
+     * @returns {string} Escaped text
+     */
+    function escapeHTML(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    /**
+     * Validates that a URL is safe (HTTP/HTTPS only)
+     * @param {string} url - URL to validate
+     * @returns {boolean} True if valid
+     */
+    function isValidURL(url) {
+      if (!url) return false;
+      try {
+        const parsed = new URL(url);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+      } catch {
+        return false;
+      }
+    }
+    
+    /**
+     * Validates coordinates are within valid bounds
+     * @param {number} lat - Latitude
+     * @param {number} lng - Longitude
+     * @returns {boolean} True if valid
+     */
+    function isValidCoordinates(lat, lng) {
+      return typeof lat === 'number' && typeof lng === 'number' &&
+             lat >= -90 && lat <= 90 &&
+             lng >= -180 && lng <= 180 &&
+             !isNaN(lat) && !isNaN(lng);
+    }
+    
+    /**
+     * Parses a date string and returns Date object
+     * @param {string} dateStr - Date string (YYYY-MM-DD)
+     * @returns {Date|null} Date object or null if invalid
+     */
+    function parseDate(dateStr) {
+      if (!dateStr) return null;
+      try {
+        const date = new Date(dateStr);
+        return isNaN(date.getTime()) ? null : date;
+      } catch {
+        return null;
+      }
+    }
+    
+    /**
+     * Formats a date as "Monday, 1 December 2025"
+     * @param {Date} date - Date object
+     * @returns {string} Formatted date string
+     */
+    function formatDate(date) {
+      if (!date) return '';
+      const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+      return date.toLocaleDateString('en-GB', options);
+    }
+    
+    /**
+     * Checks if a session has ended more than 2 hours ago
+     * @param {string} dateStr - Date string (YYYY-MM-DD)
+     * @param {string} endTime - End time (HH:MM)
+     * @returns {boolean} True if session is in the past
+     */
+    function isSessionPast(dateStr, endTime) {
+      const sessionDate = parseDate(dateStr);
+      if (!sessionDate) return true; // Invalid date, consider it past
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      sessionDate.setHours(0, 0, 0, 0);
+      
+      // If session date is before today, it's definitely past
+      if (sessionDate < today) return true;
+      
+      // If session is today, check end time
+      if (sessionDate.getTime() === today.getTime() && endTime) {
+        const [hours, minutes] = endTime.split(':').map(Number);
+        const sessionEndTime = new Date();
+        sessionEndTime.setHours(hours, minutes, 0, 0);
+        
+        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+        
+        return sessionEndTime < twoHoursAgo;
+      }
+      
+      return false;
+    }
+    
+    /**
+     * Formats time range as "18:00 - 20:00" or "18:00"
+     * @param {string} startTime - Start time (HH:MM)
+     * @param {string} endTime - End time (HH:MM)
+     * @returns {string} Formatted time string
+     */
+    function formatTimeRange(startTime, endTime) {
+      if (!startTime) return 'Time TBA';
+      if (!endTime) return startTime;
+      return `${startTime} - ${endTime}`;
+    }
+    
+    /**
+     * Calculates relative time ago (e.g., "2 mins ago")
+     * @param {Date} date - Past date
+     * @returns {string} Relative time string
+     */
+    function getRelativeTime(date) {
+      const now = new Date();
+      const diffMs = now - date;
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      
+      if (diffMins < 1) return 'just now';
+      if (diffMins === 1) return '1 min ago';
+      if (diffMins < 60) return `${diffMins} mins ago`;
+      if (diffHours === 1) return '1 hour ago';
+      if (diffHours < 24) return `${diffHours} hours ago`;
+      
+      const diffDays = Math.floor(diffMs / 86400000);
+      if (diffDays === 1) return '1 day ago';
+      return `${diffDays} days ago`;
+    }
+    
+    /**
+     * Shows a toast notification
+     * @param {string} message - Message to display
+     * @param {number} duration - Duration in milliseconds (default 2000)
+     */
+    function showToast(message, duration = 2000) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.add('visible');
+      
+      setTimeout(() => {
+        toast.classList.remove('visible');
+      }, duration);
+    }
+    
+    /**
+     * Shows a notification banner
+     * @param {string} message - Message to display
+     * @param {string} type - Type: 'error', 'warning', 'info'
+     * @param {boolean} autoDismiss - Auto-dismiss after 10 seconds
+     */
+    function showNotification(message, type = 'info', autoDismiss = true) {
+      const banner = document.getElementById('notification-banner');
+      const messageEl = document.getElementById('notification-message');
+      
+      messageEl.textContent = message;
+      banner.className = `notification-banner visible ${type}`;
+      
+      if (autoDismiss && type !== 'error') {
+        setTimeout(() => {
+          banner.classList.remove('visible');
+        }, 10000);
+      }
+    }
+    
+    /**
+     * Hides the notification banner
+     */
+    function hideNotification() {
+      const banner = document.getElementById('notification-banner');
+      banner.classList.remove('visible');
+    }
+    
+    /**
+     * Announces message to screen readers
+     * @param {string} message - Message to announce
+     */
+    function announceToScreenReader(message) {
+      const announcer = document.getElementById('sr-announcements');
+      announcer.textContent = message;
+      
+      // Clear after announcement
+      setTimeout(() => {
+        announcer.textContent = '';
+      }, 1000);
+    }
+    
+    /**
+     * Updates the result count display
+     * @param {number} count - Number of sessions
+     */
+    function updateResultCount(count) {
+      const resultCount = document.getElementById('result-count');
+      const message = count === 0 ? 'No sessions found' : `Showing ${count} session${count === 1 ? '' : 's'}`;
+      resultCount.textContent = message;
+      announceToScreenReader(message);
+    }
+    
+    /**
+     * Updates the last updated timestamp
+     * @param {Date} date - Update timestamp
+     */
+    function updateLastUpdated(date) {
+      const lastUpdated = document.getElementById('last-updated');
+      lastUpdated.textContent = `Updated ${getRelativeTime(date)}`;
+    }
+    
+    // ============================================
+    // CACHE MANAGEMENT
+    // ============================================
+    
+    /**
+     * Saves session data to localStorage cache
+     * @param {Array} data - Session data to cache
+     */
+    function saveToCache(data) {
+      try {
+        const cache = {
+          version: CACHE_VERSION,
+          timestamp: new Date().toISOString(),
+          data: data
+        };
+        localStorage.setItem('nbrh_sessions_cache', JSON.stringify(cache));
+      } catch (error) {
+        console.warn('Failed to save to cache:', error);
+        // Silent failure - localStorage might be unavailable (private browsing)
+      }
+    }
+    
+    /**
+     * Loads session data from localStorage cache
+     * @returns {Object|null} Cached data or null if invalid/expired
+     */
+    function loadFromCache() {
+      try {
+        const cached = localStorage.getItem('nbrh_sessions_cache');
+        if (!cached) return null;
+        
+        const cache = JSON.parse(cached);
+        
+        // Check version
+        if (cache.version !== CACHE_VERSION) {
+          console.log('Cache version mismatch, clearing cache');
+          localStorage.removeItem('nbrh_sessions_cache');
+          return null;
+        }
+        
+        // Check expiry (24 hours)
+        const cacheDate = new Date(cache.timestamp);
+        const now = new Date();
+        const age = now - cacheDate;
+        
+        if (age > CACHE_EXPIRY_MS) {
+          console.log('Cache expired');
+          return null;
+        }
+        
+        return cache;
+      } catch (error) {
+        console.warn('Failed to load from cache:', error);
+        return null;
+      }
+    }
+    
+    // ============================================
+    // DATA FETCHING
+    // ============================================
+    
+    /**
+     * Fetches session data from the API endpoint
+     * @param {number} attempt - Current retry attempt number
+     * @returns {Promise<Array>} Session data array
+     * @throws {Error} If fetch fails after retries
+     */
+    async function fetchSessionData(attempt = 1) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+      
+      try {
+        const response = await fetch(DATA_URL, {
+          signal: controller.signal,
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          // Handle specific HTTP errors
+          if (response.status === 404) {
+            throw new Error('No sessions configured yet. Check back soon!');
+          } else if (response.status === 500) {
+            throw new Error('Server error. Please try again in a moment.');
+          } else if (response.status === 503) {
+            throw new Error('Service temporarily unavailable. Retrying...');
+          } else {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+        }
+        
+        const data = await response.json();
+        
+        // Validate response is an array
+        if (!Array.isArray(data)) {
+          throw new Error('Invalid data format received');
+        }
+        
+        retryCount = 0; // Reset retry count on success
+        return data;
+        
+      } catch (error) {
+        clearTimeout(timeoutId);
+        
+        // Handle specific errors
+        if (error.name === 'AbortError') {
+          throw new Error('Request timed out. Please try again.');
+        }
+        
+        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+          throw new Error('Unable to load sessions. Please check your connection.');
+        }
+        
+        // Retry logic with exponential backoff
+        if (attempt < MAX_RETRY_ATTEMPTS) {
+          const delay = Math.pow(2, attempt - 1) * 1000; // 1s, 2s, 4s
+          console.log(`Retrying... (attempt ${attempt + 1} of ${MAX_RETRY_ATTEMPTS})`);
+          announceToScreenReader(`Retrying... (attempt ${attempt + 1} of ${MAX_RETRY_ATTEMPTS})`);
+          
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return fetchSessionData(attempt + 1);
+        }
+        
+        throw error;
+      }
+    }
+    
+    /**
+     * Loads and processes session data
+     * @param {boolean} showLoading - Whether to show loading overlay
+     */
+    async function loadSessionData(showLoading = true) {
+      const loadingOverlay = document.getElementById('loading-overlay');
+      const refreshBtn = document.getElementById('refresh-btn');
+      
+      try {
+        // Show loading state
+        if (showLoading && isInitialLoad) {
+          loadingOverlay.classList.remove('hidden');
+        } else if (!isInitialLoad) {
+          refreshBtn.classList.add('refresh-pulse');
+        }
+        
+        // Try to load from cache first
+        if (isInitialLoad) {
+          const cached = loadFromCache();
+          if (cached) {
+            console.log('Loaded from cache');
+            allSessions = processSessionData(cached.data);
+            renderMap();
+            updateLastUpdated(new Date(cached.timestamp));
+            
+            // Fetch fresh data in background
+            fetchSessionData().then(freshData => {
+              allSessions = processSessionData(freshData);
+              renderMap();
+              saveToCache(freshData);
+              updateLastUpdated(new Date());
+            }).catch(error => {
+              console.warn('Background refresh failed:', error);
+            });
+            
+            isInitialLoad = false;
+            return;
+          }
+        }
+        
+        // Fetch fresh data
+        const data = await fetchSessionData();
+        allSessions = processSessionData(data);
+        renderMap();
+        saveToCache(data);
+        updateLastUpdated(new Date());
+        
+        hideNotification();
+        
+        if (!isInitialLoad) {
+          showToast('Sessions updated');
+        }
+        
+      } catch (error) {
+        console.error('Failed to load sessions:', error);
+        
+        // Try to use cache as fallback
+        const cached = loadFromCache();
+        if (cached) {
+          console.log('Using cached data due to fetch error');
+          allSessions = processSessionData(cached.data);
+          renderMap();
+          updateLastUpdated(new Date(cached.timestamp));
+          showNotification(
+            `You're offline. Showing cached data from ${getRelativeTime(new Date(cached.timestamp))}.`,
+            'warning',
+            false
+          );
+        } else {
+          // No cache available, show error
+          showNotification(error.message, 'error', false);
+          showEmptyState('No sessions available. Please try refreshing the page.');
+        }
+        
+      } finally {
+        loadingOverlay.classList.add('hidden');
+        refreshBtn.classList.remove('refresh-pulse');
+        isInitialLoad = false;
+      }
+    }
+    
+    /**
+     * Processes raw session data and filters valid sessions
+     * @param {Array} rawData - Raw session data from API
+     * @returns {Array} Processed and filtered session data
+     */
+    function processSessionData(rawData) {
+      if (!Array.isArray(rawData)) return [];
+      
+      const processed = rawData
+        .filter(session => {
+          // Required fields check
+          if (!session[COLUMN_MAP.sessionName]) return false;
+          if (!session[COLUMN_MAP.sport]) return false;
+          if (!session[COLUMN_MAP.latitude]) return false;
+          if (!session[COLUMN_MAP.longitude]) return false;
+          if (!session[COLUMN_MAP.sessionStatus]) return false;
+          if (!session[COLUMN_MAP.date]) return false;
+          if (!session[COLUMN_MAP.startTime]) return false;
+          
+          // Validate coordinates
+          const lat = Number(session[COLUMN_MAP.latitude]);
+          const lng = Number(session[COLUMN_MAP.longitude]);
+          if (!isValidCoordinates(lat, lng)) {
+            console.warn(`Invalid coordinates for session: ${session[COLUMN_MAP.sessionName]}`);
+            return false;
+          }
+          
+          // Filter by status: only "General Access"
+          if (session[COLUMN_MAP.sessionStatus] !== 'General Access') return false;
+          
+          // Filter by date: only future/current sessions
+          const dateStr = session[COLUMN_MAP.date];
+          const sessionDate = parseDate(dateStr);
+          if (!sessionDate) {
+            console.warn(`Invalid date for session: ${session[COLUMN_MAP.sessionName]}`);
+            return false;
+          }
+          
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          sessionDate.setHours(0, 0, 0, 0);
+          
+          if (sessionDate < today) return false;
+          
+          // Check if session ended more than 2 hours ago
+          if (isSessionPast(dateStr, session[COLUMN_MAP.endTime])) return false;
+          
+          return true;
+        })
+        .map(session => {
+          // Create normalized session object with escaped content
+          return {
+            sessionName: escapeHTML(session[COLUMN_MAP.sessionName]),
+            sport: escapeHTML(session[COLUMN_MAP.sport]),
+            latitude: Number(session[COLUMN_MAP.latitude]),
+            longitude: Number(session[COLUMN_MAP.longitude]),
+            sessionStatus: escapeHTML(session[COLUMN_MAP.sessionStatus]),
+            location: escapeHTML(session[COLUMN_MAP.location] || ''),
+            address: escapeHTML(session[COLUMN_MAP.address] || ''),
+            date: session[COLUMN_MAP.date],
+            startTime: session[COLUMN_MAP.startTime],
+            endTime: session[COLUMN_MAP.endTime] || '',
+            basePrice: escapeHTML(session[COLUMN_MAP.basePrice] || ''),
+            bookingURL: session[COLUMN_MAP.bookingURL] || '',
+            sessionID: session[COLUMN_MAP.sessionID] || '',
+            // Pre-compute searchable text for faster filtering
+            _searchText: [
+              session[COLUMN_MAP.sessionName],
+              session[COLUMN_MAP.location],
+              session[COLUMN_MAP.address]
+            ].filter(Boolean).join(' ').toLowerCase()
+          };
+        })
+        .slice(0, MAX_EVENTS_TO_DISPLAY); // Limit to max events
+      
+      // Show warning if we hit the limit
+      if (rawData.length > MAX_EVENTS_TO_DISPLAY) {
+        showNotification(
+          `Showing first ${MAX_EVENTS_TO_DISPLAY} sessions. Use filters to refine results.`,
+          'warning'
+        );
+      }
+      
+      return processed;
+    }
+    
+    // ============================================
+    // FILTERING
+    // ============================================
+    
+    /**
+     * Filters sessions based on current filter state
+     * @param {Array} sessions - All sessions
+     * @param {string} sport - Selected sport or 'all'
+     * @param {string} searchTerm - Search query
+     * @returns {Array} Filtered sessions
+     */
+    function filterSessions(sessions, sport, searchTerm) {
+      if (!Array.isArray(sessions)) return [];
+      
+      let filtered = sessions;
+      
+      // Sport filter
+      if (sport && sport !== 'all') {
+        filtered = filtered.filter(session =>
+          session.sport.toLowerCase() === sport.toLowerCase()
+        );
+      }
+      
+      // Search filter (case-insensitive, partial match)
+      if (searchTerm && searchTerm.length >= SEARCH_MIN_CHARS) {
+        const term = searchTerm.toLowerCase();
+        filtered = filtered.filter(session =>
+          session._searchText.includes(term)
+        );
+      }
+      
+      return filtered;
+    }
+    
+    /**
+     * Applies current filters and updates the map
+     */
+    function applyFilters() {
+      filteredSessions = filterSessions(
+        allSessions,
+        currentFilters.sport,
+        currentFilters.search
+      );
+      
+      updateMarkers();
+      updateResultCount(filteredSessions.length);
+      updateURL();
+      updateClearFiltersButton();
+      
+      // Show empty state if no results
+      if (filteredSessions.length === 0) {
+        if (currentFilters.sport !== 'all' || currentFilters.search) {
+          showEmptyState('No sessions match your filters. Try adjusting your search.');
+        } else {
+          showEmptyState('No sessions available right now. Check back soon! 📅');
+        }
+      } else {
+        hideEmptyState();
+      }
+    }
+    
+    /**
+     * Shows/hides clear filters button based on active filters
+     */
+    function updateClearFiltersButton() {
+      const clearBtn = document.getElementById('clear-filters');
+      const hasActiveFilters = currentFilters.sport !== 'all' || currentFilters.search !== '';
+      
+      if (hasActiveFilters) {
+        clearBtn.classList.add('visible');
+      } else {
+        clearBtn.classList.remove('visible');
+      }
+    }
+    
+    /**
+     * Clears all active filters
+     */
+    function clearFilters() {
+      currentFilters.sport = 'all';
+      currentFilters.search = '';
+      
+      document.getElementById('sport-filter').value = 'all';
+      document.getElementById('search-input').value = '';
+      document.querySelector('.search-clear').classList.remove('visible');
+      
+      applyFilters();
+    }
+    
+    // ============================================
+    // MAP RENDERING
+    // ============================================
+    
+    /**
+     * Initializes the Leaflet map
+     */
+    function initializeMap() {
+      // Create map instance
+      map = L.map('map', {
+        center: DEFAULT_MAP_CENTER,
+        zoom: DEFAULT_MAP_ZOOM,
+        minZoom: MIN_ZOOM,
+        maxZoom: MAX_ZOOM,
+        zoomControl: true,
+        doubleClickZoom: false, // Prevent double-click zoom (can interfere with marker clicks)
+        tap: true, // Enable touch interactions
+        tapTolerance: 15
+      });
+      
+      // Add OpenStreetMap tiles
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: MAX_ZOOM
+      }).addTo(map);
+      
+      // Create layer group for markers
+      markersLayer = L.layerGroup().addTo(map);
+      
+      // Close popup when clicking empty map space
+      map.on('click', function(e) {
+        if (e.originalEvent.target.classList.contains('leaflet-container')) {
+          closePopup();
+        }
+      });
+    }
+    
+    /**
+     * Gets the emoji icon for a sport
+     * @param {string} sport - Sport name
+     * @returns {string} Emoji icon
+     */
+    function getSportIcon(sport) {
+      return SPORT_ICON_MAP[sport] || SPORT_ICON_MAP.default;
+    }
+    
+    /**
+     * Creates a custom marker for a session
+     * @param {Object} session - Session data
+     * @returns {L.Marker} Leaflet marker
+     */
+    function createMarker(session) {
+      const icon = getSportIcon(session.sport);
+      
+      const customIcon = L.divIcon({
+        className: 'custom-marker',
+        html: icon,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+        popupAnchor: [0, -16]
+      });
+      
+      const marker = L.marker([session.latitude, session.longitude], {
+        icon: customIcon,
+        alt: `${session.sport} session at ${session.location}`,
+        title: session.sessionName
+      });
+      
+      // Add click event for popup
+      marker.on('click', function() {
+        showSessionPopup(session, marker);
+      });
+      
+      return marker;
+    }
+    
+    /**
+     * Updates markers on the map based on filtered sessions
+     */
+    function updateMarkers() {
+      // Clear existing markers
+      markersLayer.clearLayers();
+      if (markerClusterGroup) {
+        map.removeLayer(markerClusterGroup);
+        markerClusterGroup = null;
+      }
+      
+      if (filteredSessions.length === 0) return;
+      
+      // Check if we need clustering
+      const needsClustering = filteredSessions.length > MARKER_CLUSTER_THRESHOLD;
+      
+      if (needsClustering) {
+        // Load MarkerCluster plugin if not already loaded
+        if (typeof L.markerClusterGroup === 'undefined') {
+          loadMarkerClusterPlugin().then(() => {
+            addMarkersWithClustering();
+          });
+        } else {
+          addMarkersWithClustering();
+        }
+      } else {
+        // Add markers without clustering
+        filteredSessions.forEach(session => {
+          const marker = createMarker(session);
+          markersLayer.addLayer(marker);
+        });
+        
+        // Fit bounds to show all markers
+        if (markersLayer.getLayers().length > 0) {
+          map.fitBounds(markersLayer.getBounds(), { padding: [50, 50] });
+        }
+      }
+    }
+    
+    /**
+     * Adds markers with clustering enabled
+     */
+    function addMarkersWithClustering() {
+      markerClusterGroup = L.markerClusterGroup({
+        maxClusterRadius: 80,
+        iconCreateFunction: function(cluster) {
+          const count = cluster.getChildCount();
+          let size = 'small';
+          if (count >= 10) size = 'large';
+          else if (count >= 5) size = 'medium';
+          
+          return L.divIcon({
+            html: `<div class="marker-cluster marker-cluster-${size}">${count}</div>`,
+            className: '',
+            iconSize: L.point(40, 40)
+          });
+        }
+      });
+      
+      filteredSessions.forEach(session => {
+        const marker = createMarker(session);
+        markerClusterGroup.addLayer(marker);
+      });
+      
+      map.addLayer(markerClusterGroup);
+      
+      // Fit bounds to show all markers
+      if (markerClusterGroup.getLayers().length > 0) {
+        map.fitBounds(markerClusterGroup.getBounds(), { padding: [50, 50] });
+      }
+    }
+    
+    /**
+     * Loads the MarkerCluster plugin dynamically
+     * @returns {Promise} Resolves when plugin is loaded
+     */
+    function loadMarkerClusterPlugin() {
+      return new Promise((resolve, reject) => {
+        if (typeof L.markerClusterGroup !== 'undefined') {
+          resolve();
+          return;
+        }
+        
+        // Load CSS
+        const css = document.createElement('link');
+        css.rel = 'stylesheet';
+        css.href = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css';
+        document.head.appendChild(css);
+        
+        const cssDefault = document.createElement('link');
+        cssDefault.rel = 'stylesheet';
+        cssDefault.href = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css';
+        document.head.appendChild(cssDefault);
+        
+        // Load JS
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js';
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+      });
+    }
+    
+    /**
+     * Renders the map with all sessions
+     */
+    function renderMap() {
+      if (!map) {
+        initializeMap();
+      }
+      
+      // Apply filters from URL on initial load
+      if (isInitialLoad) {
+        parseURLParams();
+      }
+      
+      // Populate sport filter dropdown
+      populateSportFilter();
+      
+      // Apply filters
+      applyFilters();
+      
+      // Open specific session from URL if provided
+      const urlParams = new URLSearchParams(window.location.search);
+      const sessionID = urlParams.get('session');
+      if (sessionID) {
+        const session = filteredSessions.find(s => s.sessionID === sessionID);
+        if (session) {
+          // Wait for map to settle, then open popup
+          setTimeout(() => {
+            const marker = findMarkerBySession(session);
+            if (marker) {
+              map.setView([session.latitude, session.longitude], 15);
+              showSessionPopup(session, marker);
+            }
+          }, 500);
+        }
+      }
+      
+      announceToScreenReader(`Loaded ${allSessions.length} sessions`);
+    }
+    
+    /**
+     * Finds a marker by session data
+     * @param {Object} session - Session to find
+     * @returns {L.Marker|null} Marker or null if not found
+     */
+    function findMarkerBySession(session) {
+      let targetMarker = null;
+      
+      if (markerClusterGroup) {
+        markerClusterGroup.eachLayer(marker => {
+          if (marker.getLatLng().lat === session.latitude &&
+              marker.getLatLng().lng === session.longitude) {
+            targetMarker = marker;
+          }
+        });
+      } else {
+        markersLayer.eachLayer(marker => {
+          if (marker.getLatLng().lat === session.latitude &&
+              marker.getLatLng().lng === session.longitude) {
+            targetMarker = marker;
+          }
+        });
+      }
+      
+      return targetMarker;
+    }
+    
+    // ============================================
+    // POPUP MANAGEMENT
+    // ============================================
+    
+    /**
+     * Shows session details in a popup
+     * @param {Object} session - Session data
+     * @param {L.Marker} marker - Associated marker
+     */
+    function showSessionPopup(session, marker) {
+      const isMobile = window.innerWidth < 768;
+      const popupHTML = generatePopupHTML(session);
+      
+      if (isMobile) {
+        showMobilePopup(popupHTML, marker);
+      } else {
+        showDesktopPopup(popupHTML, marker);
+      }
+    }
+    
+    /**
+     * Generates HTML content for session popup
+     * @param {Object} session - Session data
+     * @returns {string} HTML string
+     */
+    function generatePopupHTML(session) {
+      const sessionDate = parseDate(session.date);
+      const formattedDate = formatDate(sessionDate);
+      const timeRange = formatTimeRange(session.startTime, session.endTime);
+      const sportIcon = getSportIcon(session.sport);
+      const price = session.basePrice || '<span style="color: var(--color-text-secondary)">Price TBA</span>';
+      
+      // Generate directions link if address exists
+      let directionsLink = '';
+      if (session.address) {
+        const encodedAddress = encodeURIComponent(session.address);
+        directionsLink = `
+          <a href="https://www.google.com/maps/search/?api=1&query=${encodedAddress}" 
+             class="popup-directions" 
+             target="_blank" 
+             rel="noopener noreferrer">
+            Get directions →
+          </a>
+        `;
+      }
+      
+      // Generate booking button
+      const hasValidBookingURL = session.bookingURL && isValidURL(session.bookingURL);
+      const bookingButton = hasValidBookingURL
+        ? `<button class="btn-primary" onclick="window.open('${session.bookingURL}', '_blank', 'noopener,noreferrer')">
+             Book now →
+           </button>`
+        : `<button class="btn-primary" disabled style="opacity: 0.5; cursor: not-allowed;">
+             Booking unavailable
+           </button>`;
+      
+      // Generate share URL
+      const shareURL = generateShareURL(session);
+      
+      return `
+        <div class="popup-content">
+          <button class="popup-close" aria-label="Close popup" onclick="closePopup()">✕</button>
+          
+          <h2 id="popup-title" class="popup-title">${session.sessionName}</h2>
+          
+          <div class="popup-sport">
+            <span class="popup-sport-icon" aria-hidden="true">${sportIcon}</span>
+            <span>${session.sport}</span>
+          </div>
+          
+          <div class="popup-location">${session.location}</div>
+          ${session.address ? `<div class="popup-address">${session.address}</div>` : ''}
+          ${directionsLink}
+          
+          <div class="popup-datetime">
+            <div class="popup-date">${formattedDate}</div>
+            <div class="popup-time">${timeRange}</div>
+          </div>
+          
+          <div class="popup-price">${price}</div>
+          
+          <span class="popup-status">${session.sessionStatus}</span>
+          
+          <div class="popup-actions">
+            ${bookingButton}
+            <button class="btn-secondary" onclick="shareSession('${shareURL}')">
+              Share
+            </button>
+          </div>
+        </div>
+      `;
+    }
+    
+    /**
+     * Shows popup on desktop (traditional Leaflet popup)
+     * @param {string} html - Popup HTML content
+     * @param {L.Marker} marker - Associated marker
+     */
+    function showDesktopPopup(html, marker) {
+      // Store current focus
+      lastFocusedElement = document.activeElement;
+      
+      const popup = L.popup({
+        maxWidth: 400,
+        className: 'session-popup'
+      }).setContent(html);
+      
+      marker.bindPopup(popup).openPopup();
+      
+      // Focus management - focus close button after popup opens
+      setTimeout(() => {
+        const closeBtn = document.querySelector('.leaflet-popup-close-button');
+        if (closeBtn) closeBtn.focus();
+      }, 100);
+    }
+    
+    /**
+     * Shows popup on mobile (bottom sheet)
+     * @param {string} html - Popup HTML content
+     * @param {L.Marker} marker - Associated marker
+     */
+    function showMobilePopup(html, marker) {
+      // Store current focus
+      lastFocusedElement = document.activeElement;
+      
+      const backdrop = document.getElementById('mobile-popup-backdrop');
+      const popup = document.getElementById('mobile-popup');
+      const content = document.getElementById('mobile-popup-content');
+      
+      content.innerHTML = html;
+      
+      backdrop.classList.add('visible');
+      popup.classList.add('visible');
+      
+      // Focus management
+      setTimeout(() => {
+        const closeBtn = popup.querySelector('.popup-close');
+        if (closeBtn) closeBtn.focus();
+      }, 250);
+      
+      // Close on backdrop click
+      backdrop.onclick = closePopup;
+    }
+    
+    /**
+     * Closes any open popup
+     */
+    function closePopup() {
+      const isMobile = window.innerWidth < 768;
+      
+      if (isMobile) {
+        const backdrop = document.getElementById('mobile-popup-backdrop');
+        const popup = document.getElementById('mobile-popup');
+        
+        backdrop.classList.remove('visible');
+        popup.classList.remove('visible');
+      } else {
+        if (map) {
+          map.closePopup();
+        }
+      }
+      
+      // Restore focus
+      if (lastFocusedElement) {
+        lastFocusedElement.focus();
+        lastFocusedElement = null;
+      }
+    }
+    
+    /**
+     * Generates shareable URL for a session
+     * @param {Object} session - Session data
+     * @returns {string} Shareable URL
+     */
+    function generateShareURL(session) {
+      const baseURL = window.location.origin + window.location.pathname;
+      const params = new URLSearchParams();
+      
+      // Add active filters
+      if (currentFilters.sport !== 'all') {
+        params.set('sport', currentFilters.sport);
+      }
+      if (currentFilters.search) {
+        params.set('search', currentFilters.search);
+      }
+      
+      // Add session ID
+      if (session.sessionID) {
+        params.set('session', session.sessionID);
+      }
+      
+      const queryString = params.toString();
+      return queryString ? `${baseURL}?${queryString}` : baseURL;
+    }
+    
+    /**
+     * Shares a session by copying URL to clipboard
+     * @param {string} url - URL to share
+     */
+    async function shareSession(url) {
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(url);
+          showToast('Link copied to clipboard!');
+        } else {
+          // Fallback for older browsers
+          const textarea = document.createElement('textarea');
+          textarea.value = url;
+          textarea.style.position = 'fixed';
+          textarea.style.opacity = '0';
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textarea);
+          showToast('Link copied to clipboard!');
+        }
+      } catch (error) {
+        // Show URL in prompt if clipboard fails
+        prompt('Copy this link:', url);
+      }
+    }
+    
+    // Make functions globally accessible for inline onclick handlers
+    window.closePopup = closePopup;
+    window.shareSession = shareSession;
+    
+    // ============================================
+    // EMPTY STATE
+    // ============================================
+    
+    /**
+     * Shows empty state message
+     * @param {string} message - Message to display
+     */
+    function showEmptyState(message) {
+      const emptyState = document.getElementById('empty-state');
+      const messageEl = emptyState.querySelector('.empty-state-message');
+      messageEl.textContent = message;
+      emptyState.classList.remove('hidden');
+    }
+    
+    /**
+     * Hides empty state
+     */
+    function hideEmptyState() {
+      const emptyState = document.getElementById('empty-state');
+      emptyState.classList.add('hidden');
+    }
+    
+    // ============================================
+    // SPORT FILTER
+    // ============================================
+    
+    /**
+     * Populates sport filter dropdown with available sports
+     */
+    function populateSportFilter() {
+      const sportFilter = document.getElementById('sport-filter');
+      const currentValue = sportFilter.value;
+      
+      // Get unique sports from all sessions
+      const sports = [...new Set(allSessions.map(s => s.sport))].sort();
+      
+      // Clear existing options (except "All sports")
+      sportFilter.innerHTML = '<option value="all">All sports</option>';
+      
+      // Add sport options with counts
+      sports.forEach(sport => {
+        const count = allSessions.filter(s => s.sport === sport).length;
+        const option = document.createElement('option');
+        option.value = sport;
+        option.textContent = `${sport} (${count})`;
+        sportFilter.appendChild(option);
+      });
+      
+      // Restore previous selection
+      sportFilter.value = currentValue;
+    }
+    
+    // ============================================
+    // URL MANAGEMENT
+    // ============================================
+    
+    /**
+     * Parses URL parameters and applies filters
+     */
+    function parseURLParams() {
+      const params = new URLSearchParams(window.location.search);
+      
+      // Sport filter
+      const sport = params.get('sport');
+      if (sport) {
+        currentFilters.sport = sport;
+        document.getElementById('sport-filter').value = sport;
+      }
+      
+      // Search filter
+      const search = params.get('search');
+      if (search) {
+        currentFilters.search = search;
+        const searchInput = document.getElementById('search-input');
+        searchInput.value = search;
+        if (search) {
+          document.querySelector('.search-clear').classList.add('visible');
+        }
+      }
+      
+      // Map view (lat, lng, zoom) - optional
+      const lat = params.get('lat');
+      const lng = params.get('lng');
+      const zoom = params.get('zoom');
+      if (lat && lng && zoom) {
+        const latNum = parseFloat(lat);
+        const lngNum = parseFloat(lng);
+        const zoomNum = parseInt(zoom);
+        if (isValidCoordinates(latNum, lngNum) && zoomNum >= MIN_ZOOM && zoomNum <= MAX_ZOOM) {
+          if (map) {
+            map.setView([latNum, lngNum], zoomNum);
+          }
+        }
+      }
+    }
+    
+    /**
+     * Updates URL with current filter state (without reload)
+     */
+    function updateURL() {
+      const params = new URLSearchParams();
+      
+      if (currentFilters.sport !== 'all') {
+        params.set('sport', currentFilters.sport);
+      }
+      
+      if (currentFilters.search) {
+        params.set('search', currentFilters.search);
+      }
+      
+      const queryString = params.toString();
+      const newURL = queryString
+        ? `${window.location.pathname}?${queryString}`
+        : window.location.pathname;
+      
+      window.history.pushState({}, '', newURL);
+    }
+    
+    // ============================================
+    // EVENT LISTENERS
+    // ============================================
+    
+    /**
+     * Sets up all event listeners
+     */
+    function setupEventListeners() {
+      // Sport filter
+      document.getElementById('sport-filter').addEventListener('change', (e) => {
+        currentFilters.sport = e.target.value;
+        applyFilters();
+      });
+      
+      // Search input
+      const searchInput = document.getElementById('search-input');
+      searchInput.addEventListener('input', (e) => {
+        const value = e.target.value;
+        
+        // Show/hide clear button
+        const clearBtn = document.querySelector('.search-clear');
+        if (value) {
+          clearBtn.classList.add('visible');
+        } else {
+          clearBtn.classList.remove('visible');
+        }
+        
+        // Debounce search
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(() => {
+          currentFilters.search = value;
+          applyFilters();
+        }, SEARCH_DEBOUNCE_MS);
+      });
+      
+      // Search clear button
+      document.querySelector('.search-clear').addEventListener('click', () => {
+        searchInput.value = '';
+        searchInput.focus();
+        document.querySelector('.search-clear').classList.remove('visible');
+        currentFilters.search = '';
+        applyFilters();
+      });
+      
+      // Clear filters button
+      document.getElementById('clear-filters').addEventListener('click', clearFilters);
+      
+      // Refresh button
+      document.getElementById('refresh-btn').addEventListener('click', () => {
+        loadSessionData(false);
+      });
+      
+      // Notification close button
+      document.querySelector('.notification-close').addEventListener('click', hideNotification);
+      
+      // Mobile filter toggle
+      const filterToggle = document.querySelector('.filter-toggle');
+      if (filterToggle) {
+        filterToggle.addEventListener('click', () => {
+          const filterContent = document.getElementById('filter-content');
+          const icon = document.querySelector('.filter-toggle-icon');
+          const isExpanded = filterToggle.getAttribute('aria-expanded') === 'true';
+          
+          filterToggle.setAttribute('aria-expanded', !isExpanded);
+          filterContent.classList.toggle('expanded');
+          icon.classList.toggle('expanded');
+        });
+      }
+      
+      // Keyboard navigation
+      document.addEventListener('keydown', (e) => {
+        // Escape key closes popup
+        if (e.key === 'Escape') {
+          closePopup();
+        }
+      });
+      
+      // Browser back/forward navigation
+      window.addEventListener('popstate', () => {
+        parseURLParams();
+        applyFilters();
+      });
+      
+      // Page visibility - pause auto-refresh when page hidden
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          if (autoRefreshTimer) {
+            clearInterval(autoRefreshTimer);
+            autoRefreshTimer = null;
+          }
+        } else {
+          setupAutoRefresh();
+        }
+      });
+    }
+    
+    // ============================================
+    // AUTO-REFRESH
+    // ============================================
+    
+    /**
+     * Sets up auto-refresh interval
+     */
+    function setupAutoRefresh() {
+      if (autoRefreshTimer) {
+        clearInterval(autoRefreshTimer);
+      }
+      
+      autoRefreshTimer = setInterval(() => {
+        if (!document.hidden) {
+          loadSessionData(false);
+        }
+      }, AUTO_REFRESH_INTERVAL_MS);
+    }
+    
+    // ============================================
+    // INITIALIZATION
+    // ============================================
+    
+    /**
+     * Initializes the application
+     */
+    async function init() {
+      // Setup event listeners
+      setupEventListeners();
+      
+      // Load session data
+      await loadSessionData(true);
+      
+      // Setup auto-refresh
+      setupAutoRefresh();
+    }
+    
+    // Start the application when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  </script>
+</body>
+</html>
