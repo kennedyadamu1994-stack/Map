@@ -122,6 +122,14 @@
       border-bottom: 1px solid var(--color-border);
       padding: var(--space-4);
       z-index: 1000;
+      display: none; /* Hide filter bar completely */
+    }
+    
+    /* Hide filter bar on mobile by default */
+    @media (max-width: 767px) {
+      .filter-bar {
+        display: none;
+      }
     }
     
     .filter-content {
@@ -620,12 +628,18 @@
        ============================================ */
     
     .custom-marker {
-      background: transparent;
-      border: none;
-      font-size: 32px;
-      line-height: 32px;
+      background: rgba(26, 26, 26, 0.85); /* Soft black circular background */
+      border: 2px solid rgba(255, 255, 255, 0.3); /* Subtle white border */
+      border-radius: 50%; /* Make it circular */
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      line-height: 24px;
       text-align: center;
-      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+      filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5));
       animation: markerFadeIn 0.2s ease-out;
     }
     
@@ -682,7 +696,8 @@
         border-radius: var(--radius-lg);
         box-shadow: var(--shadow-strong);
         padding: 0;
-        max-width: 400px;
+        max-width: 520px;
+        min-width: 450px;
       }
       
       .leaflet-popup-content {
@@ -740,7 +755,7 @@
         background: var(--color-surface);
         border-radius: var(--radius-lg) var(--radius-lg) 0 0;
         z-index: 2001;
-        max-height: 80vh;
+        max-height: 85vh;
         overflow-y: auto;
         transform: translateY(100%);
         transition: transform 0.2s ease-out;
@@ -767,13 +782,14 @@
     
     /* Popup content */
     .popup-content {
-      padding: var(--space-6);
+      padding: var(--space-12);
+      max-width: 100%;
     }
     
     @media (max-width: 767px) {
       .popup-content {
-        padding: var(--space-4);
-        padding-top: 0;
+        padding: var(--space-6);
+        padding-top: var(--space-2);
       }
     }
     
@@ -794,6 +810,11 @@
       justify-content: center;
       border-radius: var(--radius-sm);
       z-index: 10;
+    }
+    
+    /* Hide custom close button - Leaflet provides its own on desktop, use backdrop tap on mobile */
+    .popup-close {
+      display: none;
     }
     
     .popup-close:hover {
@@ -1933,9 +1954,9 @@
       const customIcon = L.divIcon({
         className: 'custom-marker',
         html: icon,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
-        popupAnchor: [0, -16]
+        iconSize: [44, 44],
+        iconAnchor: [22, 22],
+        popupAnchor: [0, -22]
       });
       
       const marker = L.marker([session.latitude, session.longitude], {
@@ -2151,7 +2172,26 @@
       const formattedDate = formatDate(sessionDate);
       const timeRange = formatTimeRange(session.startTime, session.endTime);
       const sportIcon = getSportIcon(session.sport);
-      const price = session.basePrice || '<span style="color: var(--color-text-secondary)">Price TBA</span>';
+      
+      // Format price - ensure it includes £ symbol
+      let price = '';
+      if (session.basePrice) {
+        // If basePrice already has £, use as-is
+        if (String(session.basePrice).includes('£')) {
+          price = session.basePrice;
+        } else {
+          // Check if it's a number
+          const priceNum = parseFloat(session.basePrice);
+          if (!isNaN(priceNum)) {
+            price = `£${priceNum}`;
+          } else {
+            // It's text like "Free" or "TBC"
+            price = session.basePrice;
+          }
+        }
+      } else {
+        price = '<span style="color: var(--color-text-secondary)">Price TBA</span>';
+      }
       
       // Generate directions link if address exists
       let directionsLink = '';
