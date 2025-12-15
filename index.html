@@ -831,6 +831,12 @@
       margin-bottom: var(--space-1);
     }
     
+    .popup-location-separator {
+      height: 1px;
+      background: var(--color-border);
+      margin: var(--space-4) 0;
+    }
+    
     .popup-directions {
       font-size: 14px;
       color: var(--color-primary);
@@ -891,6 +897,75 @@
       display: flex;
       align-items: center;
       gap: var(--space-2);
+    }
+    
+    /* Session Navigation for Multiple Sessions */
+    .session-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-4);
+      margin-bottom: var(--space-4);
+      padding: var(--space-3) 0;
+      border-bottom: 1px solid var(--color-border);
+    }
+    
+    .session-nav-btn {
+      background: var(--color-background);
+      color: var(--color-text-primary);
+      border: 1px solid var(--color-border);
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .session-nav-btn:hover:not(:disabled) {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      transform: scale(1.1);
+    }
+    
+    .session-nav-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+    
+    .session-indicator {
+      font-size: 14px;
+      color: var(--color-text-secondary);
+      min-width: 60px;
+      text-align: center;
+    }
+    
+    .session-item {
+      display: none;
+      animation: sessionFadeIn 0.3s ease-out;
+    }
+    
+    .session-item.active {
+      display: block;
+    }
+    
+    @keyframes sessionFadeIn {
+      from {
+        opacity: 0;
+        transform: translateX(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+    
+    .sessions-container {
+      min-height: 200px;
+      position: relative;
     }
     
     /* ============================================
@@ -2089,8 +2164,23 @@
         <div class="popup-location">${location}</div>
         ${address ? `<div class="popup-address">${address}</div>` : ''}
         ${directionsLink}
-        <div style="height: 1px; background: var(--color-border); margin: var(--space-4) 0;"></div>
+        <div class="popup-location-separator"></div>
       `;
+      
+      // Session navigation (only show if multiple sessions)
+      const sessionNav = sessions.length > 1 ? `
+        <div class="session-nav">
+          <button class="session-nav-btn" data-action="prev-session" aria-label="Previous session">
+            ←
+          </button>
+          <div class="session-indicator">
+            <span id="current-session-num">1</span> of ${sessions.length}
+          </div>
+          <button class="session-nav-btn" data-action="next-session" aria-label="Next session">
+            →
+          </button>
+        </div>
+      ` : '';
       
       // Generate HTML for each session
       const sessionsHTML = sessions.map((session, index) => {
@@ -2126,8 +2216,11 @@
         
         const shareURL = generateShareURL(session);
         
+        // First session is active by default
+        const activeClass = index === 0 ? 'active' : '';
+        
         return `
-          <div class="session-item" style="${index > 0 ? 'margin-top: var(--space-6); padding-top: var(--space-6); border-top: 1px solid var(--color-border);' : ''}">
+          <div class="session-item ${activeClass}" data-session-index="${index}">
             <h3 class="popup-title" style="font-size: 20px; margin-bottom: var(--space-3);">${session.sessionName}</h3>
             
             <div class="popup-sport">
@@ -2167,7 +2260,11 @@
           
           ${locationHeader}
           
-          ${sessionsHTML}
+          ${sessionNav}
+          
+          <div class="sessions-container">
+            ${sessionsHTML}
+          </div>
         </div>
       `;
     }
@@ -2266,6 +2363,144 @@
           // Let the link work normally, but stop propagation
           e.stopPropagation();
         };
+      }
+      
+      // Session navigation
+      let currentSessionIndex = 0;
+      const sessionItems = document.querySelectorAll('.session-item');
+      const totalSessions = sessionItems.length;
+      
+      if (totalSessions > 1) {
+        const prevBtn = document.querySelector('[data-action="prev-session"]');
+        const nextBtn = document.querySelector('[data-action="next-session"]');
+        const currentNum = document.getElementById('current-session-num');
+        
+        function updateSessionDisplay() {
+          // Hide all sessions
+          sessionItems.forEach((item, index) => {
+            if (index === currentSessionIndex) {
+              item.classList.add('active');
+            } else {
+              item.classList.remove('active');
+            }
+          });
+          
+          // Update counter
+          if (currentNum) {
+            currentNum.textContent = currentSessionIndex + 1;
+          }
+          
+          // Update button states
+          if (prevBtn) {
+            prevBtn.disabled = currentSessionIndex === 0;
+          }
+          if (nextBtn) {
+            nextBtn.disabled = currentSessionIndex === totalSessions - 1;
+          }
+          
+          // Re-attach event listeners for the new active session's buttons
+          attachSessionButtons();
+        }
+        
+        function attachSessionButtons() {
+          const activeSession = document.querySelector('.session-item.active');
+          if (!activeSession) return;
+          
+          // Book button for active session
+          const bookBtn = activeSession.querySelector('[data-action="book"]');
+          if (bookBtn) {
+            bookBtn.onclick = function(e) {
+              e.preventDefault();
+              e.stopPropagation();
+              const url = this.getAttribute('data-url');
+              if (url) {
+                window.location.href = url;
+              }
+            };
+          }
+          
+          // Share button for active session
+          const shareBtn = activeSession.querySelector('[data-action="share"]');
+          if (shareBtn) {
+            shareBtn.onclick = function(e) {
+              e.preventDefault();
+              e.stopPropagation();
+              const url = this.getAttribute('data-url');
+              if (url) {
+                shareSession(url);
+              }
+            };
+          }
+        }
+        
+        if (prevBtn) {
+          prevBtn.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (currentSessionIndex > 0) {
+              currentSessionIndex--;
+              updateSessionDisplay();
+            }
+          };
+        }
+        
+        if (nextBtn) {
+          nextBtn.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (currentSessionIndex < totalSessions - 1) {
+              currentSessionIndex++;
+              updateSessionDisplay();
+            }
+          };
+        }
+        
+        // Keyboard navigation
+        document.addEventListener('keydown', function sessionNavKeyHandler(e) {
+          if (e.key === 'ArrowLeft' && currentSessionIndex > 0) {
+            currentSessionIndex--;
+            updateSessionDisplay();
+          } else if (e.key === 'ArrowRight' && currentSessionIndex < totalSessions - 1) {
+            currentSessionIndex++;
+            updateSessionDisplay();
+          }
+        });
+        
+        // Touch swipe support for mobile
+        let touchStartX = 0;
+        let touchEndX = 0;
+        
+        const sessionsContainer = document.querySelector('.sessions-container');
+        if (sessionsContainer) {
+          sessionsContainer.addEventListener('touchstart', function(e) {
+            touchStartX = e.changedTouches[0].screenX;
+          }, { passive: true });
+          
+          sessionsContainer.addEventListener('touchend', function(e) {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+          }, { passive: true });
+          
+          function handleSwipe() {
+            const swipeThreshold = 50; // minimum distance for swipe
+            const diff = touchStartX - touchEndX;
+            
+            if (Math.abs(diff) > swipeThreshold) {
+              if (diff > 0 && currentSessionIndex < totalSessions - 1) {
+                // Swipe left - next session
+                currentSessionIndex++;
+                updateSessionDisplay();
+              } else if (diff < 0 && currentSessionIndex > 0) {
+                // Swipe right - previous session
+                currentSessionIndex--;
+                updateSessionDisplay();
+              }
+            }
+          }
+        }
+        
+        // Initial display update
+        updateSessionDisplay();
       }
     }
     
