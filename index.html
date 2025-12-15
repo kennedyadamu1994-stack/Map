@@ -28,8 +28,6 @@
     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
     crossorigin="anonymous"/>
   
-  <!-- Leaflet MarkerCluster CSS (loaded conditionally via JS if needed) -->
-  
   <style>
     /* ============================================
        NBRH BRAND STYLES - RESET & BASE
@@ -950,6 +948,33 @@
       font-size: 16px;
       line-height: 1.6;
     }
+    
+    /* Debug console */
+    .debug-console {
+      position: fixed;
+      bottom: 80px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.9);
+      color: #0f0;
+      padding: 10px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      max-width: 300px;
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 9999;
+      display: none;
+    }
+    
+    .debug-console.visible {
+      display: block;
+    }
+    
+    .debug-console div {
+      margin-bottom: 5px;
+      white-space: pre-wrap;
+    }
   </style>
 </head>
 <body>
@@ -1006,6 +1031,9 @@
           <button id="refresh-btn" class="btn-icon" aria-label="Refresh session data" title="Refresh sessions">
             <span aria-hidden="true">↻</span>
           </button>
+          <button id="debug-toggle" class="btn-icon" aria-label="Toggle debug console" title="Show debug info" style="font-size: 16px;">
+            <span aria-hidden="true">🐛</span>
+          </button>
         </div>
         
         <!-- Clear Filters Button -->
@@ -1052,6 +1080,9 @@
     
     <!-- Screen Reader Announcements -->
     <div id="sr-announcements" class="sr-announcements" role="status" aria-live="polite" aria-atomic="true"></div>
+    
+    <!-- Debug Console -->
+    <div id="debug-console" class="debug-console"></div>
   </div>
   
   <!-- Leaflet JS -->
@@ -1061,84 +1092,72 @@
   
   <!-- Main Application Script -->
   <script>
-    /*
-    ============================================
-    NBRH SESSION MAP - SETUP INSTRUCTIONS
-    ============================================
-    
-    STEP 1: SET UP GOOGLE SHEETS API ENDPOINT
-    ------------------------------------------
-    See the separate file: google-apps-script.js
-    Follow the instructions in that file to:
-    - Deploy your Google Sheet as a JSON endpoint
-    - Get your web app URL
-    
-    STEP 2: PASTE YOUR URL BELOW
-    -----------------------------
-    Find the DATA_URL constant below (around line 620)
-    Replace the placeholder URL with YOUR Google Sheets web app URL
-    
-    It should look like:
-    const DATA_URL = 'https://script.google.com/macros/s/AKfycbw_YOUR_ID_HERE/exec';
-    
-    STEP 3: DEPLOY TO VERCEL
-    -------------------------
-    1. Create a folder called "nbrh-map"
-    2. Put this index.html file in that folder
-    3. Go to vercel.com and sign in
-    4. Drag the folder onto Vercel dashboard
-    5. Copy your Vercel URL (e.g., https://nbrh-map.vercel.app)
-    
-    STEP 4: EMBED IN SQUARESPACE
-    -----------------------------
-    1. In Squarespace, add a Code/Embed block
-    2. Paste this code (replace with YOUR Vercel URL):
-    
-       <iframe 
-         src="https://YOUR-VERCEL-URL.vercel.app" 
-         width="100%" 
-         height="600px" 
-         frameborder="0"
-         style="border: none;">
-       </iframe>
-    
-    TROUBLESHOOTING:
-    - No sessions showing? Check browser console for errors (F12)
-    - CORS error? Ensure your Apps Script is deployed with "Anyone" access
-    - Map not loading? Check that Leaflet CDN is accessible
-    - Filters not working? Verify your data matches the expected format
-    
-    CUSTOMIZATION:
-    - Change map center: Edit DEFAULT_MAP_CENTER below
-    - Add new sports: Add emoji to SPORT_ICON_MAP
-    - Adjust colors: Edit COLORS object
-    - Modify column names: Update COLUMN_MAP
-    
-    BROWSER SUPPORT:
-    - Chrome, Firefox, Safari, Edge (last 2 versions)
-    - Mobile: iOS Safari, Chrome Android
-    - No IE11 support
-    
-    ============================================
-    */
-    
     // ============================================
-    // ⚠️ IMPORTANT: PASTE YOUR GOOGLE SHEETS URL HERE
+    // DEBUG LOGGING
     // ============================================
     
-    // Replace this URL with the web app URL from your Google Apps Script deployment
-    // It should look like: https://script.google.com/macros/s/AKfycbw_YOUR_ID_HERE/exec
+    const debugLog = {
+      logs: [],
+      maxLogs: 50,
+      enabled: false,
+      
+      log: function(message, data = null) {
+        const timestamp = new Date().toLocaleTimeString();
+        const logEntry = `[${timestamp}] ${message}`;
+        
+        console.log(logEntry, data || '');
+        
+        this.logs.unshift({ message, data, timestamp });
+        if (this.logs.length > this.maxLogs) {
+          this.logs.pop();
+        }
+        
+        if (this.enabled) {
+          this.render();
+        }
+      },
+      
+      render: function() {
+        const console = document.getElementById('debug-console');
+        console.innerHTML = this.logs
+          .slice(0, 15)
+          .map(log => {
+            let displayData = '';
+            if (log.data) {
+              if (typeof log.data === 'object') {
+                displayData = ': ' + JSON.stringify(log.data).substring(0, 100);
+              } else {
+                displayData = ': ' + String(log.data).substring(0, 100);
+              }
+            }
+            return `<div>[${log.timestamp}] ${log.message}${displayData}</div>`;
+          })
+          .join('');
+      },
+      
+      toggle: function() {
+        this.enabled = !this.enabled;
+        const console = document.getElementById('debug-console');
+        if (this.enabled) {
+          console.classList.add('visible');
+          this.render();
+        } else {
+          console.classList.remove('visible');
+        }
+      }
+    };
+    
+    // ============================================
+    // CONFIGURATION
+    // ============================================
+    
     const DATA_URL = 'https://script.google.com/macros/s/AKfycbzJfRBrcH7d0Jr7sJbjvVv8Ct0s872lnrQo1FUU4dJNO2RdIbjHA7SI9u2E69JI5mPt/exec';
     
-    // ============================================
-    // MAP SETTINGS
-    // ============================================
-    const DEFAULT_MAP_CENTER = [51.5074, -0.1278]; // [latitude, longitude] for London
-    const DEFAULT_MAP_ZOOM = 11; // Zoom level (1-18, higher = closer)
-    const MIN_ZOOM = 9; // Prevent zooming out too far
-    const MAX_ZOOM = 18; // Maximum zoom level
+    const DEFAULT_MAP_CENTER = [51.5074, -0.1278];
+    const DEFAULT_MAP_ZOOM = 11;
+    const MIN_ZOOM = 9;
+    const MAX_ZOOM = 18;
     
-    // Sport icon mapping (Sport name → Emoji)
     const SPORT_ICON_MAP = {
       'Basketball': '🏀',
       'Football': '⚽',
@@ -1164,120 +1183,59 @@
       'Skateboarding': '🛹',
       'Squash': '🎾',
       'Table Tennis': '🏓',
-      'default': '📍' // Fallback for unknown sports
+      'default': '📍'
     };
     
-    // Column mapping (code field name → Google Sheet column name)
-    // Update these if your sheet uses different column names
     const COLUMN_MAP = {
-      sessionName: 'Class Name',        // Column D in your sheet
-      sport: 'Activity Type',           // Column B in your sheet
-      latitude: 'Latitude',             // Column AK in your sheet ✓
-      longitude: 'Longitude',           // Column AL in your sheet ✓
-      sessionStatus: 'Session Status',  // Column AB in your sheet ✓
-      location: 'Location',             // Column I in your sheet ✓
-      address: 'Address',               // Column H in your sheet ✓
-      date: 'Date',                     // Column E in your sheet ✓
-      startTime: 'Start Time',          // Column F in your sheet ✓
-      endTime: 'End Time',              // Column AO in your sheet ✓
-      basePrice: 'Base Price (£)',      // Column J in your sheet ✓
-      bookingURL: 'Booking URL',        // Column N in your sheet ✓
-      sessionID: 'NBRH ID'              // Column A in your sheet ✓
+      sessionName: 'Class Name',
+      sport: 'Activity Type',
+      latitude: 'Latitude',
+      longitude: 'Longitude',
+      sessionStatus: 'Session Status',
+      location: 'Location',
+      address: 'Address',
+      date: 'Date',
+      startTime: 'Start Time',
+      endTime: 'End Time',
+      basePrice: 'Base Price (£)',
+      bookingURL: 'Booking URL',
+      sessionID: 'NBRH ID'
     };
     
-    // Brand colors (NBRH palette)
-    const COLORS = {
-      primary: '#FF1493',      // Hot pink
-      background: '#1a1a1a',   // Soft black
-      surface: '#2a2a2a',      // Lighter black
-      textPrimary: '#FFFFFF',  // White
-      textSecondary: '#B3B3B3',// Grey
-      border: '#3a3a3a',       // Subtle grey
-      success: '#10B981',      // Green
-      error: '#EF4444',        // Red
-      warning: '#F59E0B'       // Amber
-    };
-    
-    // Performance settings
-    const MARKER_CLUSTER_THRESHOLD = 100; // Enable clustering if more than this many markers
-    const MAX_EVENTS_TO_DISPLAY = 500; // Maximum events to plot on map
-    const SEARCH_DEBOUNCE_MS = 300; // Delay before search executes
-    const SEARCH_MIN_CHARS = 2; // Minimum characters before search activates
-    const AUTO_REFRESH_INTERVAL_MS = 300000; // 5 minutes
-    const FETCH_TIMEOUT_MS = 10000; // 10 seconds
-    const MAX_RETRY_ATTEMPTS = 3; // Maximum fetch retry attempts
-    const CACHE_EXPIRY_MS = 86400000; // 24 hours in milliseconds
-    const CACHE_VERSION = 1; // Increment when data structure changes
-    
-    /*
-    ============================================
-    EXPECTED DATA FORMAT FROM DATA_URL
-    ============================================
-    
-    Your endpoint should return JSON in this format:
-    
-    [
-      {
-        "Session Name": "Monday Night Basketball",
-        "Sport": "Basketball",
-        "Latitude": 51.5074,
-        "Longitude": -0.1278,
-        "Session Status": "General Access",
-        "Location": "Hackney Community Centre",
-        "Address": "123 High Street, London E8 1AA",
-        "Date": "2025-12-01",
-        "Start Time": "18:00",
-        "End Time": "20:00",
-        "Base Price": "£8.00",
-        "Booking URL": "https://example.com/book/123",
-        "Session ID": "sess_001"
-      }
-    ]
-    
-    Required fields:
-    - Session Name, Sport, Latitude, Longitude, Session Status, Date, Start Time
-    
-    Optional fields:
-    - End Time, Base Price, Booking URL, Address, Session ID
-    
-    Notes:
-    - Dates must be ISO 8601 format (YYYY-MM-DD)
-    - Times must be 24-hour format (HH:MM)
-    - Latitude: -90 to 90
-    - Longitude: -180 to 180
-    - Session Status: Must be "General Access" to display
-    
-    ============================================
-    */
+    const MARKER_CLUSTER_THRESHOLD = 100;
+    const MAX_EVENTS_TO_DISPLAY = 500;
+    const SEARCH_DEBOUNCE_MS = 300;
+    const SEARCH_MIN_CHARS = 2;
+    const AUTO_REFRESH_INTERVAL_MS = 300000;
+    const FETCH_TIMEOUT_MS = 10000;
+    const MAX_RETRY_ATTEMPTS = 3;
+    const CACHE_EXPIRY_MS = 86400000;
+    const CACHE_VERSION = 1;
     
     // ============================================
     // GLOBAL STATE
     // ============================================
     
-    let map; // Leaflet map instance
-    let markersLayer; // Layer group for all markers
-    let markerClusterGroup; // MarkerCluster group (if clustering enabled)
-    let allSessions = []; // All session data from API
-    let filteredSessions = []; // Currently filtered sessions
+    let map;
+    let markersLayer;
+    let markerClusterGroup;
+    let allSessions = [];
+    let filteredSessions = [];
     let currentFilters = {
       sport: 'all',
       search: ''
     };
-    let lastFocusedElement = null; // For focus management
-    let searchDebounceTimer = null; // For search debouncing
-    let autoRefreshTimer = null; // For auto-refresh interval
-    let retryCount = 0; // Current retry attempt
-    let isInitialLoad = true; // Track if this is the first load
+    let lastFocusedElement = null;
+    let searchDebounceTimer = null;
+    let autoRefreshTimer = null;
+    let retryCount = 0;
+    let isInitialLoad = true;
+    let currentOpenPopup = null; // Track current popup
     
     // ============================================
     // UTILITY FUNCTIONS
     // ============================================
     
-    /**
-     * Escapes HTML entities to prevent XSS attacks
-     * @param {string} text - Text to escape
-     * @returns {string} Escaped text
-     */
     function escapeHTML(text) {
       if (!text) return '';
       const div = document.createElement('div');
@@ -1285,11 +1243,6 @@
       return div.innerHTML;
     }
     
-    /**
-     * Validates that a URL is safe (HTTP/HTTPS only)
-     * @param {string} url - URL to validate
-     * @returns {boolean} True if valid
-     */
     function isValidURL(url) {
       if (!url) return false;
       try {
@@ -1300,24 +1253,19 @@
       }
     }
     
-    /**
-     * Validates coordinates are within valid bounds
-     * @param {number} lat - Latitude
-     * @param {number} lng - Longitude
-     * @returns {boolean} True if valid
-     */
     function isValidCoordinates(lat, lng) {
-      return typeof lat === 'number' && typeof lng === 'number' &&
+      const valid = typeof lat === 'number' && typeof lng === 'number' &&
              lat >= -90 && lat <= 90 &&
              lng >= -180 && lng <= 180 &&
              !isNaN(lat) && !isNaN(lng);
+      
+      if (!valid) {
+        debugLog.log('Invalid coordinates', { lat, lng });
+      }
+      
+      return valid;
     }
     
-    /**
-     * Parses a date string and returns Date object
-     * @param {string} dateStr - Date string (YYYY-MM-DD)
-     * @returns {Date|null} Date object or null if invalid
-     */
     function parseDate(dateStr) {
       if (!dateStr) return null;
       try {
@@ -1328,35 +1276,22 @@
       }
     }
     
-    /**
-     * Formats a date as "Monday, 1 December 2025"
-     * @param {Date} date - Date object
-     * @returns {string} Formatted date string
-     */
     function formatDate(date) {
       if (!date) return '';
       const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
       return date.toLocaleDateString('en-GB', options);
     }
     
-    /**
-     * Checks if a session has ended more than 2 hours ago
-     * @param {string} dateStr - Date string (YYYY-MM-DD)
-     * @param {string} endTime - End time (HH:MM)
-     * @returns {boolean} True if session is in the past
-     */
     function isSessionPast(dateStr, endTime) {
       const sessionDate = parseDate(dateStr);
-      if (!sessionDate) return true; // Invalid date, consider it past
+      if (!sessionDate) return true;
       
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       sessionDate.setHours(0, 0, 0, 0);
       
-      // If session date is before today, it's definitely past
       if (sessionDate < today) return true;
       
-      // If session is today, check end time
       if (sessionDate.getTime() === today.getTime() && endTime) {
         const [hours, minutes] = endTime.split(':').map(Number);
         const sessionEndTime = new Date();
@@ -1370,23 +1305,12 @@
       return false;
     }
     
-    /**
-     * Formats time range as "18:00 - 20:00" or "18:00"
-     * @param {string} startTime - Start time (HH:MM)
-     * @param {string} endTime - End time (HH:MM)
-     * @returns {string} Formatted time string
-     */
     function formatTimeRange(startTime, endTime) {
       if (!startTime) return 'Time TBA';
       if (!endTime) return startTime;
       return `${startTime} - ${endTime}`;
     }
     
-    /**
-     * Calculates relative time ago (e.g., "2 mins ago")
-     * @param {Date} date - Past date
-     * @returns {string} Relative time string
-     */
     function getRelativeTime(date) {
       const now = new Date();
       const diffMs = now - date;
@@ -1404,11 +1328,6 @@
       return `${diffDays} days ago`;
     }
     
-    /**
-     * Shows a toast notification
-     * @param {string} message - Message to display
-     * @param {number} duration - Duration in milliseconds (default 2000)
-     */
     function showToast(message, duration = 2000) {
       const toast = document.getElementById('toast');
       toast.textContent = message;
@@ -1419,12 +1338,6 @@
       }, duration);
     }
     
-    /**
-     * Shows a notification banner
-     * @param {string} message - Message to display
-     * @param {string} type - Type: 'error', 'warning', 'info'
-     * @param {boolean} autoDismiss - Auto-dismiss after 10 seconds
-     */
     function showNotification(message, type = 'info', autoDismiss = true) {
       const banner = document.getElementById('notification-banner');
       const messageEl = document.getElementById('notification-message');
@@ -1439,43 +1352,28 @@
       }
     }
     
-    /**
-     * Hides the notification banner
-     */
     function hideNotification() {
       const banner = document.getElementById('notification-banner');
       banner.classList.remove('visible');
     }
     
-    /**
-     * Announces message to screen readers
-     * @param {string} message - Message to announce
-     */
     function announceToScreenReader(message) {
       const announcer = document.getElementById('sr-announcements');
       announcer.textContent = message;
       
-      // Clear after announcement
       setTimeout(() => {
         announcer.textContent = '';
       }, 1000);
     }
     
-    /**
-     * Updates the result count display
-     * @param {number} count - Number of sessions
-     */
     function updateResultCount(count) {
       const resultCount = document.getElementById('result-count');
       const message = count === 0 ? 'No sessions found' : `Showing ${count} session${count === 1 ? '' : 's'}`;
       resultCount.textContent = message;
       announceToScreenReader(message);
+      debugLog.log(`Result count: ${count}`);
     }
     
-    /**
-     * Updates the last updated timestamp
-     * @param {Date} date - Update timestamp
-     */
     function updateLastUpdated(date) {
       const lastUpdated = document.getElementById('last-updated');
       lastUpdated.textContent = `Updated ${getRelativeTime(date)}`;
@@ -1485,10 +1383,6 @@
     // CACHE MANAGEMENT
     // ============================================
     
-    /**
-     * Saves session data to localStorage cache
-     * @param {Array} data - Session data to cache
-     */
     function saveToCache(data) {
       try {
         const cache = {
@@ -1497,16 +1391,12 @@
           data: data
         };
         localStorage.setItem('nbrh_sessions_cache', JSON.stringify(cache));
+        debugLog.log('Saved to cache', { count: data.length });
       } catch (error) {
-        console.warn('Failed to save to cache:', error);
-        // Silent failure - localStorage might be unavailable (private browsing)
+        debugLog.log('Failed to save to cache', error.message);
       }
     }
     
-    /**
-     * Loads session data from localStorage cache
-     * @returns {Object|null} Cached data or null if invalid/expired
-     */
     function loadFromCache() {
       try {
         const cached = localStorage.getItem('nbrh_sessions_cache');
@@ -1514,26 +1404,25 @@
         
         const cache = JSON.parse(cached);
         
-        // Check version
         if (cache.version !== CACHE_VERSION) {
-          console.log('Cache version mismatch, clearing cache');
+          debugLog.log('Cache version mismatch');
           localStorage.removeItem('nbrh_sessions_cache');
           return null;
         }
         
-        // Check expiry (24 hours)
         const cacheDate = new Date(cache.timestamp);
         const now = new Date();
         const age = now - cacheDate;
         
         if (age > CACHE_EXPIRY_MS) {
-          console.log('Cache expired');
+          debugLog.log('Cache expired');
           return null;
         }
         
+        debugLog.log('Loaded from cache', { count: cache.data.length });
         return cache;
       } catch (error) {
-        console.warn('Failed to load from cache:', error);
+        debugLog.log('Failed to load from cache', error.message);
         return null;
       }
     }
@@ -1542,15 +1431,10 @@
     // DATA FETCHING
     // ============================================
     
-    /**
-     * Fetches session data from the API endpoint
-     * @param {number} attempt - Current retry attempt number
-     * @returns {Promise<Array>} Session data array
-     * @throws {Error} If fetch fails after retries
-     */
     async function fetchSessionData(attempt = 1) {
+      debugLog.log(`Fetching data (attempt ${attempt})`);
+      
       try {
-        // Use Promise.race for timeout instead of AbortController to avoid cloning issues
         const fetchPromise = fetch(DATA_URL, {
           method: 'GET',
           headers: {
@@ -1560,19 +1444,19 @@
         });
         
         const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Request timed out. Please try again.')), FETCH_TIMEOUT_MS);
+          setTimeout(() => reject(new Error('Request timed out')), FETCH_TIMEOUT_MS);
         });
         
         const response = await Promise.race([fetchPromise, timeoutPromise]);
         
         if (!response.ok) {
-          // Handle specific HTTP errors
+          debugLog.log(`HTTP error: ${response.status}`);
           if (response.status === 404) {
-            throw new Error('No sessions configured yet. Check back soon!');
+            throw new Error('No sessions configured yet');
           } else if (response.status === 500) {
-            throw new Error('Server error. Please try again in a moment.');
+            throw new Error('Server error');
           } else if (response.status === 503) {
-            throw new Error('Service temporarily unavailable. Retrying...');
+            throw new Error('Service temporarily unavailable');
           } else {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
@@ -1580,33 +1464,21 @@
         
         const data = await response.json();
         
-        // Validate response is an array
         if (!Array.isArray(data)) {
+          debugLog.log('Invalid data format', typeof data);
           throw new Error('Invalid data format received');
         }
         
-        retryCount = 0; // Reset retry count on success
+        debugLog.log('Data fetched successfully', { count: data.length });
+        retryCount = 0;
         return data;
         
       } catch (error) {
-        console.error('Fetch error:', error);
+        debugLog.log('Fetch error', error.message);
         
-        // Handle specific errors
-        if (error.message.includes('timed out')) {
-          // Already has proper message
-          throw error;
-        }
-        
-        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-          throw new Error('Unable to load sessions. Please check your connection.');
-        }
-        
-        // Retry logic with exponential backoff
         if (attempt < MAX_RETRY_ATTEMPTS && !error.message.includes('404')) {
-          const delay = Math.pow(2, attempt - 1) * 1000; // 1s, 2s, 4s
-          console.log(`Retrying... (attempt ${attempt + 1} of ${MAX_RETRY_ATTEMPTS})`);
-          announceToScreenReader(`Retrying... (attempt ${attempt + 1} of ${MAX_RETRY_ATTEMPTS})`);
-          
+          const delay = Math.pow(2, attempt - 1) * 1000;
+          debugLog.log(`Retrying in ${delay}ms`);
           await new Promise(resolve => setTimeout(resolve, delay));
           return fetchSessionData(attempt + 1);
         }
@@ -1615,39 +1487,32 @@
       }
     }
     
-    /**
-     * Loads and processes session data
-     * @param {boolean} showLoading - Whether to show loading overlay
-     */
     async function loadSessionData(showLoading = true) {
       const loadingOverlay = document.getElementById('loading-overlay');
       const refreshBtn = document.getElementById('refresh-btn');
       
       try {
-        // Show loading state
         if (showLoading && isInitialLoad) {
           loadingOverlay.classList.remove('hidden');
         } else if (!isInitialLoad) {
           refreshBtn.classList.add('refresh-pulse');
         }
         
-        // Try to load from cache first
         if (isInitialLoad) {
           const cached = loadFromCache();
           if (cached) {
-            console.log('Loaded from cache');
+            debugLog.log('Using cached data');
             allSessions = processSessionData(cached.data);
             renderMap();
             updateLastUpdated(new Date(cached.timestamp));
             
-            // Fetch fresh data in background
             fetchSessionData().then(freshData => {
               allSessions = processSessionData(freshData);
               renderMap();
               saveToCache(freshData);
               updateLastUpdated(new Date());
             }).catch(error => {
-              console.warn('Background refresh failed:', error);
+              debugLog.log('Background refresh failed', error.message);
             });
             
             isInitialLoad = false;
@@ -1655,7 +1520,6 @@
           }
         }
         
-        // Fetch fresh data
         const data = await fetchSessionData();
         allSessions = processSessionData(data);
         renderMap();
@@ -1669,12 +1533,11 @@
         }
         
       } catch (error) {
-        console.error('Failed to load sessions:', error);
+        debugLog.log('Failed to load sessions', error.message);
         
-        // Try to use cache as fallback
         const cached = loadFromCache();
         if (cached) {
-          console.log('Using cached data due to fetch error');
+          debugLog.log('Using cached data as fallback');
           allSessions = processSessionData(cached.data);
           renderMap();
           updateLastUpdated(new Date(cached.timestamp));
@@ -1684,7 +1547,6 @@
             false
           );
         } else {
-          // No cache available, show error
           showNotification(error.message, 'error', false);
           showEmptyState('No sessions available. Please try refreshing the page.');
         }
@@ -1696,41 +1558,89 @@
       }
     }
     
-    /**
-     * Processes raw session data and filters valid sessions
-     * @param {Array} rawData - Raw session data from API
-     * @returns {Array} Processed and filtered session data
-     */
     function processSessionData(rawData) {
-      if (!Array.isArray(rawData)) return [];
+      if (!Array.isArray(rawData)) {
+        debugLog.log('processSessionData: not an array');
+        return [];
+      }
+      
+      debugLog.log('Processing sessions', { rawCount: rawData.length });
+      
+      const filterStats = {
+        total: rawData.length,
+        missingFields: 0,
+        invalidCoords: 0,
+        wrongStatus: 0,
+        pastDate: 0,
+        passed: 0
+      };
       
       const processed = rawData
         .filter(session => {
           // Required fields check
-          if (!session[COLUMN_MAP.sessionName]) return false;
-          if (!session[COLUMN_MAP.sport]) return false;
-          if (!session[COLUMN_MAP.latitude]) return false;
-          if (!session[COLUMN_MAP.longitude]) return false;
-          if (!session[COLUMN_MAP.sessionStatus]) return false;
-          if (!session[COLUMN_MAP.date]) return false;
-          if (!session[COLUMN_MAP.startTime]) return false;
+          if (!session[COLUMN_MAP.sessionName]) {
+            filterStats.missingFields++;
+            debugLog.log('Missing session name', session);
+            return false;
+          }
+          if (!session[COLUMN_MAP.sport]) {
+            filterStats.missingFields++;
+            debugLog.log('Missing sport', { name: session[COLUMN_MAP.sessionName] });
+            return false;
+          }
+          if (!session[COLUMN_MAP.latitude] || !session[COLUMN_MAP.longitude]) {
+            filterStats.missingFields++;
+            debugLog.log('Missing coordinates', { name: session[COLUMN_MAP.sessionName] });
+            return false;
+          }
+          if (!session[COLUMN_MAP.sessionStatus]) {
+            filterStats.missingFields++;
+            debugLog.log('Missing status', { name: session[COLUMN_MAP.sessionName] });
+            return false;
+          }
+          if (!session[COLUMN_MAP.date]) {
+            filterStats.missingFields++;
+            debugLog.log('Missing date', { name: session[COLUMN_MAP.sessionName] });
+            return false;
+          }
+          if (!session[COLUMN_MAP.startTime]) {
+            filterStats.missingFields++;
+            debugLog.log('Missing start time', { name: session[COLUMN_MAP.sessionName] });
+            return false;
+          }
           
           // Validate coordinates
           const lat = Number(session[COLUMN_MAP.latitude]);
           const lng = Number(session[COLUMN_MAP.longitude]);
           if (!isValidCoordinates(lat, lng)) {
-            console.warn(`Invalid coordinates for session: ${session[COLUMN_MAP.sessionName]}`);
+            filterStats.invalidCoords++;
+            debugLog.log('Invalid coords', { 
+              name: session[COLUMN_MAP.sessionName],
+              lat,
+              lng
+            });
             return false;
           }
           
-          // Filter by status: only "General Access"
-          if (session[COLUMN_MAP.sessionStatus] !== 'General Access') return false;
+          // Filter by status
+          if (session[COLUMN_MAP.sessionStatus] !== 'General Access') {
+            filterStats.wrongStatus++;
+            debugLog.log('Wrong status', { 
+              name: session[COLUMN_MAP.sessionName],
+              status: session[COLUMN_MAP.sessionStatus]
+            });
+            return false;
+          }
           
-          // Filter by date: only future/current sessions
+          // Filter by date
           const dateStr = session[COLUMN_MAP.date];
           const sessionDate = parseDate(dateStr);
           if (!sessionDate) {
-            console.warn(`Invalid date for session: ${session[COLUMN_MAP.sessionName]}`);
+            filterStats.pastDate++;
+            debugLog.log('Invalid date', { 
+              name: session[COLUMN_MAP.sessionName],
+              date: dateStr
+            });
             return false;
           }
           
@@ -1738,15 +1648,20 @@
           today.setHours(0, 0, 0, 0);
           sessionDate.setHours(0, 0, 0, 0);
           
-          if (sessionDate < today) return false;
+          if (sessionDate < today) {
+            filterStats.pastDate++;
+            return false;
+          }
           
-          // Check if session ended more than 2 hours ago
-          if (isSessionPast(dateStr, session[COLUMN_MAP.endTime])) return false;
+          if (isSessionPast(dateStr, session[COLUMN_MAP.endTime])) {
+            filterStats.pastDate++;
+            return false;
+          }
           
+          filterStats.passed++;
           return true;
         })
         .map(session => {
-          // Create normalized session object with escaped content
           return {
             sessionName: escapeHTML(session[COLUMN_MAP.sessionName]),
             sport: escapeHTML(session[COLUMN_MAP.sport]),
@@ -1761,7 +1676,6 @@
             basePrice: escapeHTML(session[COLUMN_MAP.basePrice] || ''),
             bookingURL: session[COLUMN_MAP.bookingURL] || '',
             sessionID: session[COLUMN_MAP.sessionID] || '',
-            // Pre-compute searchable text for faster filtering
             _searchText: [
               session[COLUMN_MAP.sessionName],
               session[COLUMN_MAP.location],
@@ -1769,9 +1683,10 @@
             ].filter(Boolean).join(' ').toLowerCase()
           };
         })
-        .slice(0, MAX_EVENTS_TO_DISPLAY); // Limit to max events
+        .slice(0, MAX_EVENTS_TO_DISPLAY);
       
-      // Show warning if we hit the limit
+      debugLog.log('Filter stats', filterStats);
+      
       if (rawData.length > MAX_EVENTS_TO_DISPLAY) {
         showNotification(
           `Showing first ${MAX_EVENTS_TO_DISPLAY} sessions. Use filters to refine results.`,
@@ -1786,26 +1701,17 @@
     // FILTERING
     // ============================================
     
-    /**
-     * Filters sessions based on current filter state
-     * @param {Array} sessions - All sessions
-     * @param {string} sport - Selected sport or 'all'
-     * @param {string} searchTerm - Search query
-     * @returns {Array} Filtered sessions
-     */
     function filterSessions(sessions, sport, searchTerm) {
       if (!Array.isArray(sessions)) return [];
       
       let filtered = sessions;
       
-      // Sport filter
       if (sport && sport !== 'all') {
         filtered = filtered.filter(session =>
           session.sport.toLowerCase() === sport.toLowerCase()
         );
       }
       
-      // Search filter (case-insensitive, partial match)
       if (searchTerm && searchTerm.length >= SEARCH_MIN_CHARS) {
         const term = searchTerm.toLowerCase();
         filtered = filtered.filter(session =>
@@ -1816,9 +1722,6 @@
       return filtered;
     }
     
-    /**
-     * Applies current filters and updates the map
-     */
     function applyFilters() {
       filteredSessions = filterSessions(
         allSessions,
@@ -1831,7 +1734,6 @@
       updateURL();
       updateClearFiltersButton();
       
-      // Show empty state if no results
       if (filteredSessions.length === 0) {
         if (currentFilters.sport !== 'all' || currentFilters.search) {
           showEmptyState('No sessions match your filters. Try adjusting your search.');
@@ -1843,9 +1745,6 @@
       }
     }
     
-    /**
-     * Shows/hides clear filters button based on active filters
-     */
     function updateClearFiltersButton() {
       const clearBtn = document.getElementById('clear-filters');
       const hasActiveFilters = currentFilters.sport !== 'all' || currentFilters.search !== '';
@@ -1857,9 +1756,6 @@
       }
     }
     
-    /**
-     * Clears all active filters
-     */
     function clearFilters() {
       currentFilters.sport = 'all';
       currentFilters.search = '';
@@ -1875,32 +1771,28 @@
     // MAP RENDERING
     // ============================================
     
-    /**
-     * Initializes the Leaflet map
-     */
     function initializeMap() {
-      // Create map instance
+      debugLog.log('Initializing map');
+      
       map = L.map('map', {
         center: DEFAULT_MAP_CENTER,
         zoom: DEFAULT_MAP_ZOOM,
         minZoom: MIN_ZOOM,
         maxZoom: MAX_ZOOM,
         zoomControl: true,
-        doubleClickZoom: false, // Prevent double-click zoom (can interfere with marker clicks)
-        tap: true, // Enable touch interactions
+        doubleClickZoom: false,
+        tap: true,
         tapTolerance: 15
       });
       
-      // Add OpenStreetMap tiles
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: MAX_ZOOM
       }).addTo(map);
       
-      // Create layer group for markers
       markersLayer = L.layerGroup().addTo(map);
       
-      // Close popup when clicking empty map space
+      // Close popup when clicking map
       map.on('click', function(e) {
         if (e.originalEvent.target.classList.contains('leaflet-container')) {
           closePopup();
@@ -1908,20 +1800,10 @@
       });
     }
     
-    /**
-     * Gets the emoji icon for a sport
-     * @param {string} sport - Sport name
-     * @returns {string} Emoji icon
-     */
     function getSportIcon(sport) {
       return SPORT_ICON_MAP[sport] || SPORT_ICON_MAP.default;
     }
     
-    /**
-     * Creates a custom marker for a session
-     * @param {Object} session - Session data
-     * @returns {L.Marker} Leaflet marker
-     */
     function createMarker(session) {
       const icon = getSportIcon(session.sport);
       
@@ -1939,18 +1821,22 @@
         title: session.sessionName
       });
       
-      // Add click event for popup
-      marker.on('click', function() {
+      // FIXED: Use proper event handler instead of inline onclick
+      marker.on('click', function(e) {
+        // Stop propagation to prevent map click from closing popup immediately
+        L.DomEvent.stopPropagation(e);
         showSessionPopup(session, marker);
       });
       
       return marker;
     }
     
-    /**
-     * Updates markers on the map based on filtered sessions
-     */
     function updateMarkers() {
+      debugLog.log('Updating markers', { count: filteredSessions.length });
+      
+      // Close any open popup before clearing markers
+      closePopup();
+      
       // Clear existing markers
       markersLayer.clearLayers();
       if (markerClusterGroup) {
@@ -1960,11 +1846,9 @@
       
       if (filteredSessions.length === 0) return;
       
-      // Check if we need clustering
       const needsClustering = filteredSessions.length > MARKER_CLUSTER_THRESHOLD;
       
       if (needsClustering) {
-        // Load MarkerCluster plugin if not already loaded
         if (typeof L.markerClusterGroup === 'undefined') {
           loadMarkerClusterPlugin().then(() => {
             addMarkersWithClustering();
@@ -1973,22 +1857,17 @@
           addMarkersWithClustering();
         }
       } else {
-        // Add markers without clustering
         filteredSessions.forEach(session => {
           const marker = createMarker(session);
           markersLayer.addLayer(marker);
         });
         
-        // Fit bounds to show all markers
         if (markersLayer.getLayers().length > 0) {
           map.fitBounds(markersLayer.getBounds(), { padding: [50, 50] });
         }
       }
     }
     
-    /**
-     * Adds markers with clustering enabled
-     */
     function addMarkersWithClustering() {
       markerClusterGroup = L.markerClusterGroup({
         maxClusterRadius: 80,
@@ -2013,16 +1892,11 @@
       
       map.addLayer(markerClusterGroup);
       
-      // Fit bounds to show all markers
       if (markerClusterGroup.getLayers().length > 0) {
         map.fitBounds(markerClusterGroup.getBounds(), { padding: [50, 50] });
       }
     }
     
-    /**
-     * Loads the MarkerCluster plugin dynamically
-     * @returns {Promise} Resolves when plugin is loaded
-     */
     function loadMarkerClusterPlugin() {
       return new Promise((resolve, reject) => {
         if (typeof L.markerClusterGroup !== 'undefined') {
@@ -2030,7 +1904,6 @@
           return;
         }
         
-        // Load CSS
         const css = document.createElement('link');
         css.rel = 'stylesheet';
         css.href = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css';
@@ -2041,7 +1914,6 @@
         cssDefault.href = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css';
         document.head.appendChild(cssDefault);
         
-        // Load JS
         const script = document.createElement('script');
         script.src = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js';
         script.onload = resolve;
@@ -2050,32 +1922,23 @@
       });
     }
     
-    /**
-     * Renders the map with all sessions
-     */
     function renderMap() {
       if (!map) {
         initializeMap();
       }
       
-      // Apply filters from URL on initial load
       if (isInitialLoad) {
         parseURLParams();
       }
       
-      // Populate sport filter dropdown
       populateSportFilter();
-      
-      // Apply filters
       applyFilters();
       
-      // Open specific session from URL if provided
       const urlParams = new URLSearchParams(window.location.search);
       const sessionID = urlParams.get('session');
       if (sessionID) {
         const session = filteredSessions.find(s => s.sessionID === sessionID);
         if (session) {
-          // Wait for map to settle, then open popup
           setTimeout(() => {
             const marker = findMarkerBySession(session);
             if (marker) {
@@ -2089,11 +1952,6 @@
       announceToScreenReader(`Loaded ${allSessions.length} sessions`);
     }
     
-    /**
-     * Finds a marker by session data
-     * @param {Object} session - Session to find
-     * @returns {L.Marker|null} Marker or null if not found
-     */
     function findMarkerBySession(session) {
       let targetMarker = null;
       
@@ -2117,49 +1975,43 @@
     }
     
     // ============================================
-    // POPUP MANAGEMENT
+    // POPUP MANAGEMENT (FIXED)
     // ============================================
     
-    /**
-     * Shows session details in a popup
-     * @param {Object} session - Session data
-     * @param {L.Marker} marker - Associated marker
-     */
     function showSessionPopup(session, marker) {
+      debugLog.log('Showing popup', { name: session.sessionName });
+      
+      // Close any existing popup first
+      closePopup();
+      
       const isMobile = window.innerWidth < 768;
       const popupHTML = generatePopupHTML(session);
       
       if (isMobile) {
-        showMobilePopup(popupHTML, marker);
+        showMobilePopup(popupHTML, marker, session);
       } else {
-        showDesktopPopup(popupHTML, marker);
+        showDesktopPopup(popupHTML, marker, session);
       }
+      
+      // Store reference to current popup
+      currentOpenPopup = { session, marker };
     }
     
-    /**
-     * Generates HTML content for session popup
-     * @param {Object} session - Session data
-     * @returns {string} HTML string
-     */
     function generatePopupHTML(session) {
       const sessionDate = parseDate(session.date);
       const formattedDate = formatDate(sessionDate);
       const timeRange = formatTimeRange(session.startTime, session.endTime);
       const sportIcon = getSportIcon(session.sport);
       
-      // Format price - ensure it includes £ symbol
       let price = '';
       if (session.basePrice) {
-        // If basePrice already has £, use as-is
         if (String(session.basePrice).includes('£')) {
           price = session.basePrice;
         } else {
-          // Check if it's a number
           const priceNum = parseFloat(session.basePrice);
           if (!isNaN(priceNum)) {
             price = `£${priceNum}`;
           } else {
-            // It's text like "Free" or "TBC"
             price = session.basePrice;
           }
         }
@@ -2167,34 +2019,32 @@
         price = '<span style="color: var(--color-text-secondary)">Price TBA</span>';
       }
       
-      // Generate directions link if address exists (MODIFIED: removed target="_blank")
       let directionsLink = '';
       if (session.address) {
         const encodedAddress = encodeURIComponent(session.address);
         directionsLink = `
           <a href="https://www.google.com/maps/search/?api=1&query=${encodedAddress}" 
-             class="popup-directions">
+             class="popup-directions"
+             data-action="directions">
             Get directions →
           </a>
         `;
       }
       
-      // Generate booking button (MODIFIED: changed to window.location.href)
       const hasValidBookingURL = session.bookingURL && isValidURL(session.bookingURL);
       const bookingButton = hasValidBookingURL
-        ? `<button class="btn-primary" onclick="window.location.href='${session.bookingURL}'">
+        ? `<button class="btn-primary" data-action="book" data-url="${session.bookingURL}">
              Book now →
            </button>`
         : `<button class="btn-primary" disabled style="opacity: 0.5; cursor: not-allowed;">
              Booking unavailable
            </button>`;
       
-      // Generate share URL
       const shareURL = generateShareURL(session);
       
       return `
         <div class="popup-content">
-          <button class="popup-close" aria-label="Close popup" onclick="closePopup()">✕</button>
+          <button class="popup-close" aria-label="Close popup" data-action="close">✕</button>
           
           <h2 id="popup-title" class="popup-title">${session.sessionName}</h2>
           
@@ -2218,7 +2068,7 @@
           
           <div class="popup-actions">
             ${bookingButton}
-            <button class="btn-secondary" onclick="shareSession('${shareURL}')">
+            <button class="btn-secondary" data-action="share" data-url="${shareURL}">
               Share
             </button>
           </div>
@@ -2226,13 +2076,7 @@
       `;
     }
     
-    /**
-     * Shows popup on desktop (traditional Leaflet popup)
-     * @param {string} html - Popup HTML content
-     * @param {L.Marker} marker - Associated marker
-     */
-    function showDesktopPopup(html, marker) {
-      // Store current focus
+    function showDesktopPopup(html, marker, session) {
       lastFocusedElement = document.activeElement;
       
       const popup = L.popup({
@@ -2242,20 +2086,16 @@
       
       marker.bindPopup(popup).openPopup();
       
-      // Focus management - focus close button after popup opens
+      // FIXED: Add event listeners to popup content after it's rendered
       setTimeout(() => {
+        attachPopupEventListeners();
+        
         const closeBtn = document.querySelector('.leaflet-popup-close-button');
         if (closeBtn) closeBtn.focus();
       }, 100);
     }
     
-    /**
-     * Shows popup on mobile (bottom sheet)
-     * @param {string} html - Popup HTML content
-     * @param {L.Marker} marker - Associated marker
-     */
-    function showMobilePopup(html, marker) {
-      // Store current focus
+    function showMobilePopup(html, marker, session) {
       lastFocusedElement = document.activeElement;
       
       const backdrop = document.getElementById('mobile-popup-backdrop');
@@ -2267,20 +2107,75 @@
       backdrop.classList.add('visible');
       popup.classList.add('visible');
       
-      // Focus management
+      // FIXED: Add event listeners to popup content
+      attachPopupEventListeners();
+      
       setTimeout(() => {
         const closeBtn = popup.querySelector('.popup-close');
         if (closeBtn) closeBtn.focus();
       }, 250);
       
-      // Close on backdrop click
-      backdrop.onclick = closePopup;
+      // FIXED: Properly handle backdrop clicks
+      backdrop.onclick = function(e) {
+        if (e.target === backdrop) {
+          closePopup();
+        }
+      };
     }
     
-    /**
-     * Closes any open popup
-     */
+    // FIXED: Attach event listeners to popup buttons
+    function attachPopupEventListeners() {
+      debugLog.log('Attaching popup event listeners');
+      
+      // Close button
+      const closeBtn = document.querySelector('[data-action="close"]');
+      if (closeBtn) {
+        closeBtn.onclick = function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          closePopup();
+        };
+      }
+      
+      // Book button
+      const bookBtn = document.querySelector('[data-action="book"]');
+      if (bookBtn) {
+        bookBtn.onclick = function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          const url = this.getAttribute('data-url');
+          if (url) {
+            window.location.href = url;
+          }
+        };
+      }
+      
+      // Share button
+      const shareBtn = document.querySelector('[data-action="share"]');
+      if (shareBtn) {
+        shareBtn.onclick = function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          const url = this.getAttribute('data-url');
+          if (url) {
+            shareSession(url);
+          }
+        };
+      }
+      
+      // Directions link
+      const directionsLink = document.querySelector('[data-action="directions"]');
+      if (directionsLink) {
+        directionsLink.onclick = function(e) {
+          // Let the link work normally, but stop propagation
+          e.stopPropagation();
+        };
+      }
+    }
+    
     function closePopup() {
+      debugLog.log('Closing popup');
+      
       const isMobile = window.innerWidth < 768;
       
       if (isMobile) {
@@ -2289,29 +2184,27 @@
         
         backdrop.classList.remove('visible');
         popup.classList.remove('visible');
+        
+        // Clear backdrop onclick
+        backdrop.onclick = null;
       } else {
         if (map) {
           map.closePopup();
         }
       }
       
-      // Restore focus
+      currentOpenPopup = null;
+      
       if (lastFocusedElement) {
         lastFocusedElement.focus();
         lastFocusedElement = null;
       }
     }
     
-    /**
-     * Generates shareable URL for a session
-     * @param {Object} session - Session data
-     * @returns {string} Shareable URL
-     */
     function generateShareURL(session) {
       const baseURL = window.location.origin + window.location.pathname;
       const params = new URLSearchParams();
       
-      // Add active filters
       if (currentFilters.sport !== 'all') {
         params.set('sport', currentFilters.sport);
       }
@@ -2319,7 +2212,6 @@
         params.set('search', currentFilters.search);
       }
       
-      // Add session ID
       if (session.sessionID) {
         params.set('session', session.sessionID);
       }
@@ -2328,17 +2220,12 @@
       return queryString ? `${baseURL}?${queryString}` : baseURL;
     }
     
-    /**
-     * Shares a session by copying URL to clipboard
-     * @param {string} url - URL to share
-     */
     async function shareSession(url) {
       try {
         if (navigator.clipboard && navigator.clipboard.writeText) {
           await navigator.clipboard.writeText(url);
           showToast('Link copied to clipboard!');
         } else {
-          // Fallback for older browsers
           const textarea = document.createElement('textarea');
           textarea.value = url;
           textarea.style.position = 'fixed';
@@ -2350,23 +2237,14 @@
           showToast('Link copied to clipboard!');
         }
       } catch (error) {
-        // Show URL in prompt if clipboard fails
         prompt('Copy this link:', url);
       }
     }
-    
-    // Make functions globally accessible for inline onclick handlers
-    window.closePopup = closePopup;
-    window.shareSession = shareSession;
     
     // ============================================
     // EMPTY STATE
     // ============================================
     
-    /**
-     * Shows empty state message
-     * @param {string} message - Message to display
-     */
     function showEmptyState(message) {
       const emptyState = document.getElementById('empty-state');
       const messageEl = emptyState.querySelector('.empty-state-message');
@@ -2374,9 +2252,6 @@
       emptyState.classList.remove('hidden');
     }
     
-    /**
-     * Hides empty state
-     */
     function hideEmptyState() {
       const emptyState = document.getElementById('empty-state');
       emptyState.classList.add('hidden');
@@ -2386,20 +2261,14 @@
     // SPORT FILTER
     // ============================================
     
-    /**
-     * Populates sport filter dropdown with available sports
-     */
     function populateSportFilter() {
       const sportFilter = document.getElementById('sport-filter');
       const currentValue = sportFilter.value;
       
-      // Get unique sports from all sessions
       const sports = [...new Set(allSessions.map(s => s.sport))].sort();
       
-      // Clear existing options (except "All sports")
       sportFilter.innerHTML = '<option value="all">All sports</option>';
       
-      // Add sport options with counts
       sports.forEach(sport => {
         const count = allSessions.filter(s => s.sport === sport).length;
         const option = document.createElement('option');
@@ -2408,7 +2277,6 @@
         sportFilter.appendChild(option);
       });
       
-      // Restore previous selection
       sportFilter.value = currentValue;
     }
     
@@ -2416,20 +2284,15 @@
     // URL MANAGEMENT
     // ============================================
     
-    /**
-     * Parses URL parameters and applies filters
-     */
     function parseURLParams() {
       const params = new URLSearchParams(window.location.search);
       
-      // Sport filter
       const sport = params.get('sport');
       if (sport) {
         currentFilters.sport = sport;
         document.getElementById('sport-filter').value = sport;
       }
       
-      // Search filter
       const search = params.get('search');
       if (search) {
         currentFilters.search = search;
@@ -2440,7 +2303,6 @@
         }
       }
       
-      // Map view (lat, lng, zoom) - optional
       const lat = params.get('lat');
       const lng = params.get('lng');
       const zoom = params.get('zoom');
@@ -2456,9 +2318,6 @@
       }
     }
     
-    /**
-     * Updates URL with current filter state (without reload)
-     */
     function updateURL() {
       const params = new URLSearchParams();
       
@@ -2482,22 +2341,18 @@
     // EVENT LISTENERS
     // ============================================
     
-    /**
-     * Sets up all event listeners
-     */
     function setupEventListeners() {
-      // Sport filter
+      debugLog.log('Setting up event listeners');
+      
       document.getElementById('sport-filter').addEventListener('change', (e) => {
         currentFilters.sport = e.target.value;
         applyFilters();
       });
       
-      // Search input
       const searchInput = document.getElementById('search-input');
       searchInput.addEventListener('input', (e) => {
         const value = e.target.value;
         
-        // Show/hide clear button
         const clearBtn = document.querySelector('.search-clear');
         if (value) {
           clearBtn.classList.add('visible');
@@ -2505,7 +2360,6 @@
           clearBtn.classList.remove('visible');
         }
         
-        // Debounce search
         clearTimeout(searchDebounceTimer);
         searchDebounceTimer = setTimeout(() => {
           currentFilters.search = value;
@@ -2513,7 +2367,6 @@
         }, SEARCH_DEBOUNCE_MS);
       });
       
-      // Search clear button
       document.querySelector('.search-clear').addEventListener('click', () => {
         searchInput.value = '';
         searchInput.focus();
@@ -2522,18 +2375,18 @@
         applyFilters();
       });
       
-      // Clear filters button
       document.getElementById('clear-filters').addEventListener('click', clearFilters);
       
-      // Refresh button
       document.getElementById('refresh-btn').addEventListener('click', () => {
         loadSessionData(false);
       });
       
-      // Notification close button
+      document.getElementById('debug-toggle').addEventListener('click', () => {
+        debugLog.toggle();
+      });
+      
       document.querySelector('.notification-close').addEventListener('click', hideNotification);
       
-      // Mobile filter toggle
       const filterToggle = document.querySelector('.filter-toggle');
       if (filterToggle) {
         filterToggle.addEventListener('click', () => {
@@ -2547,21 +2400,17 @@
         });
       }
       
-      // Keyboard navigation
       document.addEventListener('keydown', (e) => {
-        // Escape key closes popup
         if (e.key === 'Escape') {
           closePopup();
         }
       });
       
-      // Browser back/forward navigation
       window.addEventListener('popstate', () => {
         parseURLParams();
         applyFilters();
       });
       
-      // Page visibility - pause auto-refresh when page hidden
       document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
           if (autoRefreshTimer) {
@@ -2578,9 +2427,6 @@
     // AUTO-REFRESH
     // ============================================
     
-    /**
-     * Sets up auto-refresh interval
-     */
     function setupAutoRefresh() {
       if (autoRefreshTimer) {
         clearInterval(autoRefreshTimer);
@@ -2597,21 +2443,13 @@
     // INITIALIZATION
     // ============================================
     
-    /**
-     * Initializes the application
-     */
     async function init() {
-      // Setup event listeners
+      debugLog.log('Initializing app');
       setupEventListeners();
-      
-      // Load session data
       await loadSessionData(true);
-      
-      // Setup auto-refresh
       setupAutoRefresh();
     }
     
-    // Start the application when DOM is ready
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', init);
     } else {
