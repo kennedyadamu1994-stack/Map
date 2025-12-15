@@ -1031,7 +1031,7 @@
           <button id="refresh-btn" class="btn-icon" aria-label="Refresh session data" title="Refresh sessions">
             <span aria-hidden="true">↻</span>
           </button>
-          <button id="debug-toggle" class="btn-icon" aria-label="Toggle debug console" title="Show debug info" style="font-size: 16px;">
+          <button id="debug-toggle" class="btn-icon" aria-label="Toggle debug console" title="Show debug info" style="font-size: 16px; display: none;">
             <span aria-hidden="true">🐛</span>
           </button>
         </div>
@@ -1176,14 +1176,13 @@
       'Gym': '🏋️',
       'Hockey': '🏒',
       'Martial Arts': '🥋',
-      'Netball': '🥅',
       'Padel': '🎾',
       'Pilates': '🧘‍♀️',
       'Rounders': '⚾',
       'Skateboarding': '🛹',
       'Squash': '🎾',
       'Table Tennis': '🏓',
-      'default': '📍'
+      'default': '📍' // Used for Netball and any other unmapped sports
     };
     
     const COLUMN_MAP = {
@@ -1804,28 +1803,48 @@
       return SPORT_ICON_MAP[sport] || SPORT_ICON_MAP.default;
     }
     
-    function createMarker(session) {
-      const icon = getSportIcon(session.sport);
+    /**
+     * Creates a custom marker for session(s) at a location
+     * @param {Array} sessions - Array of session data at this location
+     * @returns {L.Marker} Leaflet marker
+     */
+    function createMarker(sessions) {
+      const firstSession = sessions[0];
+      
+      // If multiple sports at this location, show pin. Otherwise show sport icon.
+      const uniqueSports = [...new Set(sessions.map(s => s.sport))];
+      let icon;
+      
+      if (uniqueSports.length > 1) {
+        icon = '📍'; // Multiple sports = pin
+      } else {
+        icon = getSportIcon(firstSession.sport);
+      }
+      
+      // Create marker label showing number of sessions if > 1
+      const markerLabel = sessions.length > 1 ? `${icon}<span style="position:absolute;bottom:-2px;right:-2px;background:#FF1493;color:white;border-radius:50%;width:18px;height:18px;font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:bold;">${sessions.length}</span>` : icon;
       
       const customIcon = L.divIcon({
         className: 'custom-marker',
-        html: icon,
+        html: markerLabel,
         iconSize: [44, 44],
         iconAnchor: [22, 22],
         popupAnchor: [0, -22]
       });
       
-      const marker = L.marker([session.latitude, session.longitude], {
+      const locationName = firstSession.location || 'This location';
+      const sessionCount = sessions.length > 1 ? ` (${sessions.length} sessions)` : '';
+      
+      const marker = L.marker([firstSession.latitude, firstSession.longitude], {
         icon: customIcon,
-        alt: `${session.sport} session at ${session.location}`,
-        title: session.sessionName
+        alt: `${locationName}${sessionCount}`,
+        title: `${locationName}${sessionCount}`
       });
       
-      // FIXED: Use proper event handler instead of inline onclick
+      // FIXED: Use proper event handler with sessions array
       marker.on('click', function(e) {
-        // Stop propagation to prevent map click from closing popup immediately
         L.DomEvent.stopPropagation(e);
-        showSessionPopup(session, marker);
+        showSessionPopup(sessions, marker);
       });
       
       return marker;
@@ -1846,19 +1865,23 @@
       
       if (filteredSessions.length === 0) return;
       
-      const needsClustering = filteredSessions.length > MARKER_CLUSTER_THRESHOLD;
+      // Group sessions by location (lat/lng)
+      const sessionsByLocation = groupSessionsByLocation(filteredSessions);
+      debugLog.log('Grouped into locations', { locationCount: Object.keys(sessionsByLocation).length });
+      
+      const needsClustering = Object.keys(sessionsByLocation).length > MARKER_CLUSTER_THRESHOLD;
       
       if (needsClustering) {
         if (typeof L.markerClusterGroup === 'undefined') {
           loadMarkerClusterPlugin().then(() => {
-            addMarkersWithClustering();
+            addMarkersWithClustering(sessionsByLocation);
           });
         } else {
-          addMarkersWithClustering();
+          addMarkersWithClustering(sessionsByLocation);
         }
       } else {
-        filteredSessions.forEach(session => {
-          const marker = createMarker(session);
+        Object.values(sessionsByLocation).forEach(locationData => {
+          const marker = createMarker(locationData.sessions);
           markersLayer.addLayer(marker);
         });
         
@@ -1868,7 +1891,42 @@
       }
     }
     
-    function addMarkersWithClustering() {
+    /**
+     * Groups sessions by their coordinates to handle multiple sessions at same location
+     * @param {Array} sessions - Array of session objects
+     * @returns {Object} Object with location keys and session arrays
+     */
+    function groupSessionsByLocation(sessions) {
+      const grouped = {};
+      
+      sessions.forEach(session => {
+        // Create a unique key for this location (rounded to 6 decimal places to handle tiny GPS differences)
+        const locationKey = `${session.latitude.toFixed(6)},${session.longitude.toFixed(6)}`;
+        
+        if (!grouped[locationKey]) {
+          grouped[locationKey] = {
+            latitude: session.latitude,
+            longitude: session.longitude,
+            sessions: []
+          };
+        }
+        
+        grouped[locationKey].sessions.push(session);
+      });
+      
+      // Sort sessions at each location by date and time
+      Object.values(grouped).forEach(locationData => {
+        locationData.sessions.sort((a, b) => {
+          const dateCompare = a.date.localeCompare(b.date);
+          if (dateCompare !== 0) return dateCompare;
+          return a.startTime.localeCompare(b.startTime);
+        });
+      });
+      
+      return grouped;
+    }
+    
+    function addMarkersWithClustering(sessionsByLocation) {
       markerClusterGroup = L.markerClusterGroup({
         maxClusterRadius: 80,
         iconCreateFunction: function(cluster) {
@@ -1885,8 +1943,8 @@
         }
       });
       
-      filteredSessions.forEach(session => {
-        const marker = createMarker(session);
+      Object.values(sessionsByLocation).forEach(locationData => {
+        const marker = createMarker(locationData.sessions);
         markerClusterGroup.addLayer(marker);
       });
       
@@ -1978,50 +2036,45 @@
     // POPUP MANAGEMENT (FIXED)
     // ============================================
     
-    function showSessionPopup(session, marker) {
-      debugLog.log('Showing popup', { name: session.sessionName });
+    function showSessionPopup(sessions, marker) {
+      // Normalize to array (in case single session is passed)
+      const sessionsArray = Array.isArray(sessions) ? sessions : [sessions];
+      
+      debugLog.log('Showing popup', { 
+        sessionCount: sessionsArray.length,
+        names: sessionsArray.map(s => s.sessionName)
+      });
       
       // Close any existing popup first
       closePopup();
       
       const isMobile = window.innerWidth < 768;
-      const popupHTML = generatePopupHTML(session);
+      const popupHTML = generatePopupHTML(sessionsArray);
       
       if (isMobile) {
-        showMobilePopup(popupHTML, marker, session);
+        showMobilePopup(popupHTML, marker, sessionsArray);
       } else {
-        showDesktopPopup(popupHTML, marker, session);
+        showDesktopPopup(popupHTML, marker, sessionsArray);
       }
       
       // Store reference to current popup
-      currentOpenPopup = { session, marker };
+      currentOpenPopup = { sessions: sessionsArray, marker };
     }
     
-    function generatePopupHTML(session) {
-      const sessionDate = parseDate(session.date);
-      const formattedDate = formatDate(sessionDate);
-      const timeRange = formatTimeRange(session.startTime, session.endTime);
-      const sportIcon = getSportIcon(session.sport);
+    /**
+     * Generates HTML content for session popup (handles multiple sessions at same location)
+     * @param {Array} sessions - Array of session data at this location
+     * @returns {string} HTML string
+     */
+    function generatePopupHTML(sessions) {
+      const firstSession = sessions[0];
+      const location = firstSession.location || 'This location';
+      const address = firstSession.address || '';
       
-      let price = '';
-      if (session.basePrice) {
-        if (String(session.basePrice).includes('£')) {
-          price = session.basePrice;
-        } else {
-          const priceNum = parseFloat(session.basePrice);
-          if (!isNaN(priceNum)) {
-            price = `£${priceNum}`;
-          } else {
-            price = session.basePrice;
-          }
-        }
-      } else {
-        price = '<span style="color: var(--color-text-secondary)">Price TBA</span>';
-      }
-      
+      // Generate directions link
       let directionsLink = '';
-      if (session.address) {
-        const encodedAddress = encodeURIComponent(session.address);
+      if (address) {
+        const encodedAddress = encodeURIComponent(address);
         directionsLink = `
           <a href="https://www.google.com/maps/search/?api=1&query=${encodedAddress}" 
              class="popup-directions"
@@ -2031,47 +2084,90 @@
         `;
       }
       
-      const hasValidBookingURL = session.bookingURL && isValidURL(session.bookingURL);
-      const bookingButton = hasValidBookingURL
-        ? `<button class="btn-primary" data-action="book" data-url="${session.bookingURL}">
-             Book now →
-           </button>`
-        : `<button class="btn-primary" disabled style="opacity: 0.5; cursor: not-allowed;">
-             Booking unavailable
-           </button>`;
+      // Location header (same for all sessions)
+      const locationHeader = `
+        <div class="popup-location">${location}</div>
+        ${address ? `<div class="popup-address">${address}</div>` : ''}
+        ${directionsLink}
+        <div style="height: 1px; background: var(--color-border); margin: var(--space-4) 0;"></div>
+      `;
       
-      const shareURL = generateShareURL(session);
+      // Generate HTML for each session
+      const sessionsHTML = sessions.map((session, index) => {
+        const sessionDate = parseDate(session.date);
+        const formattedDate = formatDate(sessionDate);
+        const timeRange = formatTimeRange(session.startTime, session.endTime);
+        const sportIcon = getSportIcon(session.sport);
+        
+        let price = '';
+        if (session.basePrice) {
+          if (String(session.basePrice).includes('£')) {
+            price = session.basePrice;
+          } else {
+            const priceNum = parseFloat(session.basePrice);
+            if (!isNaN(priceNum)) {
+              price = `£${priceNum}`;
+            } else {
+              price = session.basePrice;
+            }
+          }
+        } else {
+          price = '<span style="color: var(--color-text-secondary)">Price TBA</span>';
+        }
+        
+        const hasValidBookingURL = session.bookingURL && isValidURL(session.bookingURL);
+        const bookingButton = hasValidBookingURL
+          ? `<button class="btn-primary" data-action="book" data-url="${session.bookingURL}">
+               Book now →
+             </button>`
+          : `<button class="btn-primary" disabled style="opacity: 0.5; cursor: not-allowed;">
+               Booking unavailable
+             </button>`;
+        
+        const shareURL = generateShareURL(session);
+        
+        return `
+          <div class="session-item" style="${index > 0 ? 'margin-top: var(--space-6); padding-top: var(--space-6); border-top: 1px solid var(--color-border);' : ''}">
+            <h3 class="popup-title" style="font-size: 20px; margin-bottom: var(--space-3);">${session.sessionName}</h3>
+            
+            <div class="popup-sport">
+              <span class="popup-sport-icon" aria-hidden="true">${sportIcon}</span>
+              <span>${session.sport}</span>
+            </div>
+            
+            <div class="popup-datetime">
+              <div class="popup-date">${formattedDate}</div>
+              <div class="popup-time">${timeRange}</div>
+            </div>
+            
+            <div class="popup-price">${price}</div>
+            
+            <div class="popup-actions">
+              ${bookingButton}
+              <button class="btn-secondary" data-action="share" data-url="${shareURL}">
+                Share
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+      
+      // Title shows session count if multiple
+      const titleText = sessions.length > 1 
+        ? `${sessions.length} sessions at this location`
+        : location;
       
       return `
         <div class="popup-content">
           <button class="popup-close" aria-label="Close popup" data-action="close">✕</button>
           
-          <h2 id="popup-title" class="popup-title">${session.sessionName}</h2>
+          <h2 id="popup-title" style="font-size: 18px; font-weight: 600; margin-bottom: var(--space-4); color: var(--color-primary);">
+            ${titleText}
+          </h2>
           
-          <div class="popup-sport">
-            <span class="popup-sport-icon" aria-hidden="true">${sportIcon}</span>
-            <span>${session.sport}</span>
-          </div>
+          ${locationHeader}
           
-          <div class="popup-location">${session.location}</div>
-          ${session.address ? `<div class="popup-address">${session.address}</div>` : ''}
-          ${directionsLink}
-          
-          <div class="popup-datetime">
-            <div class="popup-date">${formattedDate}</div>
-            <div class="popup-time">${timeRange}</div>
-          </div>
-          
-          <div class="popup-price">${price}</div>
-          
-          <span class="popup-status">${session.sessionStatus}</span>
-          
-          <div class="popup-actions">
-            ${bookingButton}
-            <button class="btn-secondary" data-action="share" data-url="${shareURL}">
-              Share
-            </button>
-          </div>
+          ${sessionsHTML}
         </div>
       `;
     }
