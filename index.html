@@ -2167,24 +2167,22 @@
         price = '<span style="color: var(--color-text-secondary)">Price TBA</span>';
       }
       
-      // Generate directions link if address exists
+      // Generate directions link if address exists (MODIFIED: removed target="_blank")
       let directionsLink = '';
       if (session.address) {
         const encodedAddress = encodeURIComponent(session.address);
         directionsLink = `
           <a href="https://www.google.com/maps/search/?api=1&query=${encodedAddress}" 
-             class="popup-directions" 
-             target="_blank" 
-             rel="noopener noreferrer">
+             class="popup-directions">
             Get directions →
           </a>
         `;
       }
       
-      // Generate booking button
+      // Generate booking button (MODIFIED: changed to window.location.href)
       const hasValidBookingURL = session.bookingURL && isValidURL(session.bookingURL);
       const bookingButton = hasValidBookingURL
-        ? `<button class="btn-primary" onclick="window.open('${session.bookingURL}', '_blank', 'noopener,noreferrer')">
+        ? `<button class="btn-primary" onclick="window.location.href='${session.bookingURL}'">
              Book now →
            </button>`
         : `<button class="btn-primary" disabled style="opacity: 0.5; cursor: not-allowed;">
