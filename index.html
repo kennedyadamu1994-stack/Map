@@ -1747,7 +1747,7 @@
             date: session[COLUMN_MAP.date],
             startTime: session[COLUMN_MAP.startTime],
             endTime: session[COLUMN_MAP.endTime] || '',
-            basePrice: escapeHTML(session[COLUMN_MAP.basePrice] || ''),
+            basePrice: session[COLUMN_MAP.basePrice] !== null && session[COLUMN_MAP.basePrice] !== undefined ? escapeHTML(String(session[COLUMN_MAP.basePrice])) : '',
             bookingURL: session[COLUMN_MAP.bookingURL] || '',
             sessionID: session[COLUMN_MAP.sessionID] || '',
             _searchText: [
