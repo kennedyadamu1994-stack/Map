@@ -122,11 +122,59 @@
       z-index: 1000;
     }
     
+    .filter-bar-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      gap: var(--space-6);
+      align-items: center;
+    }
+    
+    /* Logo */
+    .logo-link {
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+      text-decoration: none;
+      transition: opacity 0.2s ease;
+    }
+    
+    .logo-link:hover {
+      opacity: 0.8;
+    }
+    
+    .logo-link:focus {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 4px;
+      border-radius: var(--radius-sm);
+    }
+    
+    .logo-img {
+      height: 40px;
+      width: auto;
+      display: block;
+    }
+    
+    @media (max-width: 767px) {
+      .logo-img {
+        height: 32px;
+      }
+      
+      .filter-bar-container {
+        flex-direction: column;
+        gap: var(--space-4);
+        align-items: stretch;
+      }
+      
+      .logo-link {
+        justify-content: center;
+      }
+    }
+    
     /* Hide filter bar on mobile by default */
     
     .filter-content {
-      max-width: 1200px;
-      margin: 0 auto;
+      flex: 1;
       display: flex;
       flex-wrap: wrap;
       gap: var(--space-4);
@@ -1066,55 +1114,66 @@
   
   <!-- Main App Container -->
   <div class="app-container">
-    <!-- Filter Bar -->
+    <!-- Filter Bar with Logo -->
     <nav class="filter-bar" role="navigation" aria-label="Session filters">
-      <!-- Mobile filter toggle -->
-      <button class="filter-toggle" aria-expanded="false" aria-controls="filter-content">
-        <span>Filters & Search</span>
-        <span class="filter-toggle-icon" aria-hidden="true">▼</span>
-      </button>
-      
-      <!-- Filter Controls -->
-      <div id="filter-content" class="filter-content">
-        <!-- Sport Filter -->
-        <div class="input-group">
-          <label for="sport-filter" class="sr-only">Filter sessions by sport</label>
-          <select id="sport-filter" aria-label="Filter sessions by sport">
-            <option value="all">All sports</option>
-          </select>
-        </div>
-        
-        <!-- Search Bar -->
-        <div class="input-group search-wrapper">
-          <label for="search-input" class="sr-only">Search sessions by name, location, or address</label>
-          <span class="search-icon" aria-hidden="true">🔍</span>
-          <input 
-            type="text" 
-            id="search-input" 
-            placeholder="Search by name, location, or address"
-            aria-label="Search sessions by name, location, or address"
-            autocomplete="off"
+      <div class="filter-bar-container">
+        <!-- Logo -->
+        <a href="https://www.thenbrh.co.uk/" class="logo-link" aria-label="NBRH Homepage">
+          <img 
+            src="https://images.squarespace-cdn.com/content/6718416feaa24175e29324d4/9d6e6464-e1e5-4dde-9ae0-03df420cbd77/NBRH+Logo.png" 
+            alt="NBRH Logo" 
+            class="logo-img"
           />
-          <button class="search-clear" aria-label="Clear search" tabindex="-1">
-            ✕
-          </button>
-        </div>
+        </a>
         
-        <!-- Results Info & Actions -->
-        <div class="results-info">
-          <span id="result-count" class="result-count" aria-live="polite" aria-atomic="true">Loading...</span>
-          <button id="refresh-btn" class="btn-icon" aria-label="Refresh session data" title="Refresh sessions">
-            <span aria-hidden="true">↻</span>
-          </button>
-          <button id="debug-toggle" class="btn-icon" aria-label="Toggle debug console" title="Show debug info" style="font-size: 16px; display: none;">
-            <span aria-hidden="true">🐛</span>
-          </button>
-        </div>
-        
-        <!-- Clear Filters Button -->
-        <button id="clear-filters" class="btn-clear-filters" aria-label="Clear all filters">
-          Clear filters
+        <!-- Mobile filter toggle -->
+        <button class="filter-toggle" aria-expanded="false" aria-controls="filter-content">
+          <span>Filters & Search</span>
+          <span class="filter-toggle-icon" aria-hidden="true">▼</span>
         </button>
+        
+        <!-- Filter Controls -->
+        <div id="filter-content" class="filter-content">
+          <!-- Sport Filter -->
+          <div class="input-group">
+            <label for="sport-filter" class="sr-only">Filter sessions by sport</label>
+            <select id="sport-filter" aria-label="Filter sessions by sport">
+              <option value="all">All sports</option>
+            </select>
+          </div>
+          
+          <!-- Search Bar -->
+          <div class="input-group search-wrapper">
+            <label for="search-input" class="sr-only">Search sessions by name, location, or address</label>
+            <span class="search-icon" aria-hidden="true">🔍</span>
+            <input 
+              type="text" 
+              id="search-input" 
+              placeholder="Search by name, location, or address"
+              aria-label="Search sessions by name, location, or address"
+              autocomplete="off"
+            />
+            <button class="search-clear" aria-label="Clear search" tabindex="-1">
+              ✕
+            </button>
+          </div>
+          
+          <!-- Results Info & Actions -->
+          <div class="results-info">
+            <span id="result-count" class="result-count" aria-live="polite" aria-atomic="true">Loading...</span>
+            <button id="refresh-btn" class="btn-icon" aria-label="Refresh session data" title="Refresh sessions">
+              <span aria-hidden="true">↻</span>
+            </button>
+            <button id="debug-toggle" class="btn-icon" aria-label="Toggle debug console" title="Show debug info" style="font-size: 16px; display: none;">
+              <span aria-hidden="true">🐛</span>
+            </button>
+          </div>
+          
+          <!-- Clear Filters Button -->
+          <button id="clear-filters" class="btn-clear-filters" aria-label="Clear all filters">
+            Clear filters
+          </button>
+        </div>
       </div>
     </nav>
     
