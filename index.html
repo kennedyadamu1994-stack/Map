@@ -1820,12 +1820,7 @@
       
       debugLog.log('Filter stats', filterStats);
       
-      if (rawData.length > MAX_EVENTS_TO_DISPLAY) {
-        showNotification(
-          `Showing first ${MAX_EVENTS_TO_DISPLAY} sessions. Use filters to refine results.`,
-          'warning'
-        );
-      }
+      // Notification removed - sessions are still limited to MAX_EVENTS_TO_DISPLAY for performance
       
       return processed;
     }
