@@ -1193,9 +1193,9 @@
       
       <!-- Empty State -->
       <div id="empty-state" class="empty-state hidden">
-        <div class="empty-state-emoji" aria-hidden="true">📅</div>
+        <div class="empty-state-emoji" aria-hidden="true">🏀</div>
         <div class="empty-state-title">No sessions available</div>
-        <div class="empty-state-message">Check back soon for upcoming sports sessions!</div>
+        <div class="empty-state-message">Try adjusting your filters or search.</div>
       </div>
       
       <!-- Last Updated Timestamp -->
@@ -1406,6 +1406,21 @@
     function parseDate(dateStr) {
       if (!dateStr) return null;
       try {
+        // Handle UK date format (D/M/YYYY) or (DD/MM/YYYY)
+        // Check if it looks like D/M/YYYY or DD/MM/YYYY format
+        const ukFormatMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        
+        if (ukFormatMatch) {
+          // Parse as UK format: day/month/year
+          const day = parseInt(ukFormatMatch[1], 10);
+          const month = parseInt(ukFormatMatch[2], 10) - 1; // Months are 0-indexed
+          const year = parseInt(ukFormatMatch[3], 10);
+          
+          const date = new Date(year, month, day);
+          return isNaN(date.getTime()) ? null : date;
+        }
+        
+        // Fallback to default parsing for other formats
         const date = new Date(dateStr);
         return isNaN(date.getTime()) ? null : date;
       } catch {
@@ -1415,31 +1430,8 @@
     
     function formatDate(date) {
       if (!date) return '';
-      const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
-      return date.toLocaleDateString('en-GB', options);
-    }
-    
-    function isSessionPast(dateStr, endTime) {
-      const sessionDate = parseDate(dateStr);
-      if (!sessionDate) return true;
-      
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      sessionDate.setHours(0, 0, 0, 0);
-      
-      if (sessionDate < today) return true;
-      
-      if (sessionDate.getTime() === today.getTime() && endTime) {
-        const [hours, minutes] = endTime.split(':').map(Number);
-        const sessionEndTime = new Date();
-        sessionEndTime.setHours(hours, minutes, 0, 0);
-        
-        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
-        
-        return sessionEndTime < twoHoursAgo;
-      }
-      
-      return false;
+      const options = { weekday: 'long' };
+      return date.toLocaleDateString('en-GB', options) + 's'; // e.g., "Mondays", "Tuesdays"
     }
     
     function formatTimeRange(startTime, endTime) {
@@ -1769,7 +1761,7 @@
             return false;
           }
           
-          // Filter by date
+          // Parse date to get day of week (but don't filter by past dates - these are recurring sessions)
           const dateStr = session[COLUMN_MAP.date];
           const sessionDate = parseDate(dateStr);
           if (!sessionDate) {
@@ -1778,20 +1770,6 @@
               name: session[COLUMN_MAP.sessionName],
               date: dateStr
             });
-            return false;
-          }
-          
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          sessionDate.setHours(0, 0, 0, 0);
-          
-          if (sessionDate < today) {
-            filterStats.pastDate++;
-            return false;
-          }
-          
-          if (isSessionPast(dateStr, session[COLUMN_MAP.endTime])) {
-            filterStats.pastDate++;
             return false;
           }
           
@@ -1868,7 +1846,7 @@
         if (currentFilters.sport !== 'all' || currentFilters.search) {
           showEmptyState('No sessions match your filters. Try adjusting your search.');
         } else {
-          showEmptyState('No sessions available right now. Check back soon! 📅');
+          showEmptyState('No sessions available right now.');
         }
       } else {
         hideEmptyState();
@@ -2275,7 +2253,7 @@
             </div>
             
             <div class="popup-datetime">
-              <div class="popup-date">${formattedDate}</div>
+              <div class="popup-date" style="font-weight: 600;">${formattedDate}</div>
               <div class="popup-time">${timeRange}</div>
             </div>
             
