@@ -1287,7 +1287,7 @@
     
     // IMPORTANT: Replace this URL with your deployed Google Apps Script web app URL
     // See DEPLOYMENT_INSTRUCTIONS.md for details
-    const DATA_URL = 'https://script.google.com/macros/s/AKfycbxTED00BSZ2a1WVFUHdL9Tv2klq5c3LFnLeNC8cljY_-GIhqLDSgbIubzZ1gdsx7Tpc/exec';
+    const DATA_URL = 'YOUR_DEPLOYED_SCRIPT_URL_HERE';
     
     const DEFAULT_MAP_CENTER = [51.5074, -0.1278];
     const DEFAULT_MAP_ZOOM = 11;
@@ -1920,7 +1920,7 @@
         maxZoom: MAX_ZOOM
       }).addTo(map);
       
-      markersLayer = L.layerGroup().addTo(map);
+      markersLayer = L.featureGroup().addTo(map);
       
       // Close popup when clicking map
       map.on('click', function(e) {
