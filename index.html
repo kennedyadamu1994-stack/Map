@@ -1285,7 +1285,9 @@
     // CONFIGURATION
     // ============================================
     
-    const DATA_URL = 'https://script.google.com/macros/s/AKfycbzJfRBrcH7d0Jr7sJbjvVv8Ct0s872lnrQo1FUU4dJNO2RdIbjHA7SI9u2E69JI5mPt/exec';
+    // IMPORTANT: Replace this URL with your deployed Google Apps Script web app URL
+    // See DEPLOYMENT_INSTRUCTIONS.md for details
+    const DATA_URL = 'https://script.google.com/macros/s/AKfycbxTED00BSZ2a1WVFUHdL9Tv2klq5c3LFnLeNC8cljY_-GIhqLDSgbIubzZ1gdsx7Tpc/exec';
     
     const DEFAULT_MAP_CENTER = [51.5074, -0.1278];
     const DEFAULT_MAP_ZOOM = 11;
@@ -1310,13 +1312,15 @@
       'Gym': '🏋️',
       'Hockey': '🏒',
       'Martial Arts': '🥋',
+      'MMA': '🥊',
       'Padel': '🎾',
       'Pilates': '🧘‍♀️',
       'Rounders': '⚾',
       'Skateboarding': '🛹',
       'Squash': '🎾',
       'Table Tennis': '🏓',
-      'default': '📍' // Used for Netball and any other unmapped sports
+      'Taekwondo': '🥋',
+      'default': '📍'
     };
     
     const COLUMN_MAP = {
@@ -1363,7 +1367,7 @@
     let autoRefreshTimer = null;
     let retryCount = 0;
     let isInitialLoad = true;
-    let currentOpenPopup = null; // Track current popup
+    let currentOpenPopup = null;
     
     // ============================================
     // UTILITY FUNCTIONS
@@ -1820,8 +1824,6 @@
       
       debugLog.log('Filter stats', filterStats);
       
-      // Notification removed - sessions are still limited to MAX_EVENTS_TO_DISPLAY for performance
-      
       return processed;
     }
     
@@ -1970,7 +1972,6 @@
         title: `${locationName}${sessionCount}`
       });
       
-      // FIXED: Use proper event handler with sessions array
       marker.on('click', function(e) {
         L.DomEvent.stopPropagation(e);
         showSessionPopup(sessions, marker);
@@ -1982,10 +1983,8 @@
     function updateMarkers() {
       debugLog.log('Updating markers', { count: filteredSessions.length });
       
-      // Close any open popup before clearing markers
       closePopup();
       
-      // Clear existing markers
       markersLayer.clearLayers();
       if (markerClusterGroup) {
         map.removeLayer(markerClusterGroup);
@@ -1994,7 +1993,6 @@
       
       if (filteredSessions.length === 0) return;
       
-      // Group sessions by location (lat/lng)
       const sessionsByLocation = groupSessionsByLocation(filteredSessions);
       debugLog.log('Grouped into locations', { locationCount: Object.keys(sessionsByLocation).length });
       
@@ -2029,7 +2027,6 @@
       const grouped = {};
       
       sessions.forEach(session => {
-        // Create a unique key for this location (rounded to 6 decimal places to handle tiny GPS differences)
         const locationKey = `${session.latitude.toFixed(6)},${session.longitude.toFixed(6)}`;
         
         if (!grouped[locationKey]) {
@@ -2043,7 +2040,6 @@
         grouped[locationKey].sessions.push(session);
       });
       
-      // Sort sessions at each location by date and time
       Object.values(grouped).forEach(locationData => {
         locationData.sessions.sort((a, b) => {
           const dateCompare = a.date.localeCompare(b.date);
@@ -2162,11 +2158,10 @@
     }
     
     // ============================================
-    // POPUP MANAGEMENT (FIXED)
+    // POPUP MANAGEMENT
     // ============================================
     
     function showSessionPopup(sessions, marker) {
-      // Normalize to array (in case single session is passed)
       const sessionsArray = Array.isArray(sessions) ? sessions : [sessions];
       
       debugLog.log('Showing popup', { 
@@ -2174,7 +2169,6 @@
         names: sessionsArray.map(s => s.sessionName)
       });
       
-      // Close any existing popup first
       closePopup();
       
       const isMobile = window.innerWidth < 768;
@@ -2186,12 +2180,11 @@
         showDesktopPopup(popupHTML, marker, sessionsArray);
       }
       
-      // Store reference to current popup
       currentOpenPopup = { sessions: sessionsArray, marker };
     }
     
     /**
-     * Generates HTML content for session popup (handles multiple sessions at same location)
+     * Generates HTML content for session popup
      * @param {Array} sessions - Array of session data at this location
      * @returns {string} HTML string
      */
@@ -2200,7 +2193,6 @@
       const location = firstSession.location || 'This location';
       const address = firstSession.address || '';
       
-      // Generate directions link
       let directionsLink = '';
       if (address) {
         const encodedAddress = encodeURIComponent(address);
@@ -2213,7 +2205,6 @@
         `;
       }
       
-      // Location header (same for all sessions)
       const locationHeader = `
         <div class="popup-location">${location}</div>
         ${address ? `<div class="popup-address">${address}</div>` : ''}
@@ -2221,7 +2212,6 @@
         <div class="popup-location-separator"></div>
       `;
       
-      // Session navigation (only show if multiple sessions)
       const sessionNav = sessions.length > 1 ? `
         <div class="session-nav">
           <button class="session-nav-btn" data-action="prev-session" aria-label="Previous session">
@@ -2236,14 +2226,12 @@
         </div>
       ` : '';
       
-      // Generate HTML for each session
       const sessionsHTML = sessions.map((session, index) => {
         const sessionDate = parseDate(session.date);
         const formattedDate = formatDate(sessionDate);
         const timeRange = formatTimeRange(session.startTime, session.endTime);
         const sportIcon = getSportIcon(session.sport);
         
-        // FIXED: Price display logic - shows "Free" for £0 sessions
         let price = '';
         if (session.basePrice !== null && session.basePrice !== undefined && session.basePrice !== '') {
           if (String(session.basePrice).includes('£')) {
@@ -2275,7 +2263,6 @@
         
         const shareURL = generateShareURL(session);
         
-        // First session is active by default
         const activeClass = index === 0 ? 'active' : '';
         
         return `
@@ -2304,7 +2291,6 @@
         `;
       }).join('');
       
-      // Title shows session count if multiple
       const titleText = sessions.length > 1 
         ? `${sessions.length} sessions at this location`
         : location;
@@ -2338,7 +2324,6 @@
       
       marker.bindPopup(popup).openPopup();
       
-      // FIXED: Add event listeners to popup content after it's rendered
       setTimeout(() => {
         attachPopupEventListeners();
         
@@ -2359,7 +2344,6 @@
       backdrop.classList.add('visible');
       popup.classList.add('visible');
       
-      // FIXED: Add event listeners to popup content
       attachPopupEventListeners();
       
       setTimeout(() => {
@@ -2367,7 +2351,6 @@
         if (closeBtn) closeBtn.focus();
       }, 250);
       
-      // FIXED: Properly handle backdrop clicks
       backdrop.onclick = function(e) {
         if (e.target === backdrop) {
           closePopup();
@@ -2375,11 +2358,9 @@
       };
     }
     
-    // FIXED: Attach event listeners to popup buttons
     function attachPopupEventListeners() {
       debugLog.log('Attaching popup event listeners');
       
-      // Close button
       const closeBtn = document.querySelector('[data-action="close"]');
       if (closeBtn) {
         closeBtn.onclick = function(e) {
@@ -2389,7 +2370,6 @@
         };
       }
       
-      // Book button
       const bookBtn = document.querySelector('[data-action="book"]');
       if (bookBtn) {
         bookBtn.onclick = function(e) {
@@ -2402,7 +2382,6 @@
         };
       }
       
-      // Share button
       const shareBtn = document.querySelector('[data-action="share"]');
       if (shareBtn) {
         shareBtn.onclick = function(e) {
@@ -2415,16 +2394,13 @@
         };
       }
       
-      // Directions link
       const directionsLink = document.querySelector('[data-action="directions"]');
       if (directionsLink) {
         directionsLink.onclick = function(e) {
-          // Let the link work normally, but stop propagation
           e.stopPropagation();
         };
       }
       
-      // Session navigation
       let currentSessionIndex = 0;
       const sessionItems = document.querySelectorAll('.session-item');
       const totalSessions = sessionItems.length;
@@ -2435,7 +2411,6 @@
         const currentNum = document.getElementById('current-session-num');
         
         function updateSessionDisplay() {
-          // Hide all sessions
           sessionItems.forEach((item, index) => {
             if (index === currentSessionIndex) {
               item.classList.add('active');
@@ -2444,12 +2419,10 @@
             }
           });
           
-          // Update counter
           if (currentNum) {
             currentNum.textContent = currentSessionIndex + 1;
           }
           
-          // Update button states
           if (prevBtn) {
             prevBtn.disabled = currentSessionIndex === 0;
           }
@@ -2457,7 +2430,6 @@
             nextBtn.disabled = currentSessionIndex === totalSessions - 1;
           }
           
-          // Re-attach event listeners for the new active session's buttons
           attachSessionButtons();
         }
         
@@ -2465,7 +2437,6 @@
           const activeSession = document.querySelector('.session-item.active');
           if (!activeSession) return;
           
-          // Book button for active session
           const bookBtn = activeSession.querySelector('[data-action="book"]');
           if (bookBtn) {
             bookBtn.onclick = function(e) {
@@ -2478,7 +2449,6 @@
             };
           }
           
-          // Share button for active session
           const shareBtn = activeSession.querySelector('[data-action="share"]');
           if (shareBtn) {
             shareBtn.onclick = function(e) {
@@ -2514,7 +2484,6 @@
           };
         }
         
-        // Keyboard navigation
         document.addEventListener('keydown', function sessionNavKeyHandler(e) {
           if (e.key === 'ArrowLeft' && currentSessionIndex > 0) {
             currentSessionIndex--;
@@ -2525,7 +2494,6 @@
           }
         });
         
-        // Touch swipe support for mobile
         let touchStartX = 0;
         let touchEndX = 0;
         
@@ -2541,16 +2509,14 @@
           }, { passive: true });
           
           function handleSwipe() {
-            const swipeThreshold = 50; // minimum distance for swipe
+            const swipeThreshold = 50;
             const diff = touchStartX - touchEndX;
             
             if (Math.abs(diff) > swipeThreshold) {
               if (diff > 0 && currentSessionIndex < totalSessions - 1) {
-                // Swipe left - next session
                 currentSessionIndex++;
                 updateSessionDisplay();
               } else if (diff < 0 && currentSessionIndex > 0) {
-                // Swipe right - previous session
                 currentSessionIndex--;
                 updateSessionDisplay();
               }
@@ -2558,7 +2524,6 @@
           }
         }
         
-        // Initial display update
         updateSessionDisplay();
       }
     }
@@ -2575,7 +2540,6 @@
         backdrop.classList.remove('visible');
         popup.classList.remove('visible');
         
-        // Clear backdrop onclick
         backdrop.onclick = null;
       } else {
         if (map) {
